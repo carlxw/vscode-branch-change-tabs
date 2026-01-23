@@ -4,6 +4,7 @@
   "description": "Opens modified files when switching git branches (excluding configured branches).",
   "version": "0.0.1",
   "publisher": "your-name",
+  "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -72,7 +73,8 @@
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -watch -p .",
-    "lint": "echo \"No lint configured\""
+    "lint": "echo \"No lint configured\"",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
