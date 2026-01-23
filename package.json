@@ -1,0 +1,72 @@
+{
+  "name": "branch-change-tabs",
+  "displayName": "Branch Change Tabs",
+  "description": "Opens modified files when switching git branches (excluding configured branches).",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "workspaceContains:.git"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Branch Change Tabs",
+      "properties": {
+        "branchTabs.excludedBranches": {
+          "type": "array",
+          "default": [
+            "main",
+            "master"
+          ],
+          "description": "Branch names that should not trigger auto-opening files.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branchTabs.closeAllBeforeOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Close all open editors before opening changed files."
+        },
+        "branchTabs.pinOpenedTabs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pin editors opened by the extension (preview=false)."
+        },
+        "branchTabs.excludeRegexes": {
+          "type": "array",
+          "default": [],
+          "description": "List of regex strings to exclude file paths from opening.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branchTabs.baseBranch": {
+          "type": "string",
+          "default": "",
+          "description": "Optional base branch/ref to diff against. If empty, uses upstream if set, otherwise main/master when available."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "lint": "echo \"No lint configured\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
