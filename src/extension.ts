@@ -38,6 +38,9 @@ type RepoState = {
 const repoStates = new Map<string, RepoState>();
 const output = vscode.window.createOutputChannel("Branch Change Tabs");
 
+/**
+ * Entry point for the extension; wires up git repository listeners.
+ */
 export function activate(context: vscode.ExtensionContext) {
   const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git")?.exports;
   if (!gitExtension) {
@@ -56,6 +59,9 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
+/**
+ * Registers listeners for a git repository and debounces state changes.
+ */
 function trackRepository(repo: Repository, context: vscode.ExtensionContext) {
   const key = repo.rootUri.fsPath;
   if (repoStates.has(key)) {
@@ -81,6 +87,9 @@ function trackRepository(repo: Repository, context: vscode.ExtensionContext) {
   context.subscriptions.push(subscription);
 }
 
+/**
+ * Handles a repository state change by opening the branch's changed files.
+ */
 async function handleRepositoryChange(repo: Repository) {
   const key = repo.rootUri.fsPath;
   const state = repoStates.get(key);
@@ -189,6 +198,9 @@ async function handleRepositoryChange(repo: Repository) {
   }
 }
 
+/**
+ * Loads extension settings from the VS Code configuration.
+ */
 function getSettings() {
   const config = vscode.workspace.getConfiguration("branchTabs");
   return {
@@ -202,6 +214,9 @@ function getSettings() {
   };
 }
 
+/**
+ * Determines the base ref used for diffing a branch.
+ */
 async function resolveBaseRef(
   repoRoot: string,
   configuredBase: string,
@@ -230,6 +245,9 @@ async function resolveBaseRef(
   return undefined;
 }
 
+/**
+ * Checks whether a git ref exists in the repository.
+ */
 async function refExists(repoRoot: string, ref: string): Promise<boolean> {
   try {
     await execGit(repoRoot, ["rev-parse", "--verify", ref]);
@@ -239,6 +257,9 @@ async function refExists(repoRoot: string, ref: string): Promise<boolean> {
   }
 }
 
+/**
+ * Returns repo-relative file paths changed between base and head refs.
+ */
 async function getChangedFiles(repoRoot: string, baseRef: string, headRef: string): Promise<string[]> {
   try {
     const { stdout } = await execGit(repoRoot, ["diff", "--name-only", `${baseRef}...${headRef}`]);
@@ -252,6 +273,9 @@ async function getChangedFiles(repoRoot: string, baseRef: string, headRef: strin
   }
 }
 
+/**
+ * Filters files that match any of the configured exclude regexes.
+ */
 function filterExcluded(files: string[], regexes: string[]): string[] {
   const compiled = regexes
     .map((pattern) => parseRegex(pattern))
@@ -262,6 +286,9 @@ function filterExcluded(files: string[], regexes: string[]): string[] {
   return files.filter((file) => !compiled.some((regex) => regex.test(file)));
 }
 
+/**
+ * Parses a regex string, supporting "/pattern/flags" or "pattern" formats.
+ */
 function parseRegex(value: string): RegExp | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -288,6 +315,9 @@ function parseRegex(value: string): RegExp | undefined {
   }
 }
 
+/**
+ * Checks if a file exists on disk via the VS Code FS API.
+ */
 async function fileExists(uri: vscode.Uri): Promise<boolean> {
   try {
     await vscode.workspace.fs.stat(uri);
@@ -297,10 +327,16 @@ async function fileExists(uri: vscode.Uri): Promise<boolean> {
   }
 }
 
+/**
+ * Executes a git command in the repository root.
+ */
 async function execGit(repoRoot: string, args: string[]) {
   return execFileAsync("git", args, { cwd: repoRoot, windowsHide: true });
 }
 
+/**
+ * Formats an error into a readable message.
+ */
 function stringifyError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -308,6 +344,9 @@ function stringifyError(error: unknown): string {
   return String(error);
 }
 
+/**
+ * Closes tabs that were opened by the extension.
+ */
 async function closeOpenedFiles(state: RepoState) {
   if (state.openedFiles.size === 0) {
     return;
@@ -331,4 +370,7 @@ async function closeOpenedFiles(state: RepoState) {
   state.openedFiles.clear();
 }
 
+/**
+ * Extension deactivation hook (no-op).
+ */
 export function deactivate() {}
