@@ -32,6 +32,7 @@ interface Branch {
 type RepoState = {
   lastBranch?: string;
   pendingTimer?: NodeJS.Timeout;
+  openedFiles: Set<string>;
 };
 
 const repoStates = new Map<string, RepoState>();
@@ -61,7 +62,7 @@ function trackRepository(repo: Repository, context: vscode.ExtensionContext) {
     return;
   }
 
-  repoStates.set(key, { lastBranch: repo.state.HEAD?.name });
+  repoStates.set(key, { lastBranch: repo.state.HEAD?.name, openedFiles: new Set() });
 
   const subscription = repo.state.onDidChange(() => {
     const state = repoStates.get(key);
@@ -97,18 +98,28 @@ async function handleRepositoryChange(repo: Repository) {
 
   const settings = getSettings();
   if (settings.excludedBranches.includes(currentBranch)) {
-    output.appendLine(`Branch "${currentBranch}" excluded. Skipping.`);
+    output.appendLine(`Branch "${currentBranch}" excluded.`);
+    if (settings.closeAllOnExcludedBranch) {
+      await closeOpenedFiles(state);
+    }
     return;
   }
 
   output.appendLine(`Branch changed: ${previousBranch ?? "(unknown)"} -> ${currentBranch}`);
 
   const repoRoot = repo.rootUri.fsPath;
-  const baseRef = await resolveBaseRef(repoRoot, settings.baseBranch, repo.state.HEAD?.upstream?.name);
+  const baseRef = await resolveBaseRef(
+    repoRoot,
+    settings.baseBranch,
+    repo.state.HEAD?.name,
+    repo.state.HEAD?.upstream?.name
+  );
   if (!baseRef) {
     output.appendLine("No base ref found. Skipping diff.");
     return;
   }
+
+  output.appendLine(`Using base ref: ${baseRef}`);
 
   const changedFiles = await getChangedFiles(repoRoot, baseRef, currentBranch);
   if (!changedFiles.length) {
@@ -116,26 +127,65 @@ async function handleRepositoryChange(repo: Repository) {
     return;
   }
 
+  output.appendLine(`Changed files found: ${changedFiles.length}`);
+
   const filteredFiles = filterExcluded(changedFiles, settings.excludeRegexes);
   if (!filteredFiles.length) {
     output.appendLine("All changed files were excluded by regex.");
     return;
   }
 
+  output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
+
+  if (settings.maxFilesToOpen > 0 && filteredFiles.length > settings.maxFilesToOpen) {
+    output.appendLine(
+      `Aborting open: ${filteredFiles.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
+    );
+    return;
+  }
+
   if (settings.closeAllBeforeOpen) {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   }
+  state.openedFiles.clear();
 
-  for (const file of filteredFiles) {
-    const fileUri = vscode.Uri.file(path.join(repoRoot, file));
-    if (!(await fileExists(fileUri))) {
-      continue;
+  if (settings.pinOpenedTabs) {
+    for (const file of filteredFiles) {
+      const fileUri = vscode.Uri.file(path.join(repoRoot, file));
+      if (!(await fileExists(fileUri))) {
+        continue;
+      }
+      try {
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        await vscode.window.showTextDocument(doc, {
+          preview: false,
+          preserveFocus: false,
+          viewColumn: vscode.ViewColumn.Active
+        });
+        await vscode.commands.executeCommand("workbench.action.pinEditor");
+        state.openedFiles.add(fileUri.toString());
+      } catch (error) {
+        output.appendLine(`Skipping non-text file "${file}": ${stringifyError(error)}`);
+      }
     }
-    await vscode.window.showTextDocument(fileUri, {
-      preview: !settings.pinOpenedTabs,
-      preserveFocus: true,
-      viewColumn: vscode.ViewColumn.Active
-    });
+  } else {
+    for (const file of filteredFiles) {
+      const fileUri = vscode.Uri.file(path.join(repoRoot, file));
+      if (!(await fileExists(fileUri))) {
+        continue;
+      }
+      try {
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        await vscode.window.showTextDocument(doc, {
+          preview: true,
+          preserveFocus: true,
+          viewColumn: vscode.ViewColumn.Active
+        });
+        state.openedFiles.add(fileUri.toString());
+      } catch (error) {
+        output.appendLine(`Skipping non-text file "${file}": ${stringifyError(error)}`);
+      }
+    }
   }
 }
 
@@ -146,6 +196,8 @@ function getSettings() {
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
     pinOpenedTabs: config.get<boolean>("pinOpenedTabs", true),
     excludeRegexes: config.get<string[]>("excludeRegexes", []),
+    maxFilesToOpen: config.get<number>("maxFilesToOpen", 10),
+    closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
     baseBranch: config.get<string>("baseBranch", "")
   };
 }
@@ -153,14 +205,11 @@ function getSettings() {
 async function resolveBaseRef(
   repoRoot: string,
   configuredBase: string,
+  currentBranch?: string,
   upstream?: string
 ): Promise<string | undefined> {
   if (configuredBase && configuredBase.trim().length > 0) {
     return configuredBase.trim();
-  }
-
-  if (upstream && upstream.trim().length > 0) {
-    return upstream.trim();
   }
 
   if (await refExists(repoRoot, "main")) {
@@ -168,6 +217,14 @@ async function resolveBaseRef(
   }
   if (await refExists(repoRoot, "master")) {
     return "master";
+  }
+
+  if (upstream && upstream.trim().length > 0) {
+    const upstreamRef = upstream.trim();
+    if (currentBranch && upstreamRef.endsWith(`/${currentBranch}`)) {
+      return undefined;
+    }
+    return upstreamRef;
   }
 
   return undefined;
@@ -249,6 +306,29 @@ function stringifyError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function closeOpenedFiles(state: RepoState) {
+  if (state.openedFiles.size === 0) {
+    return;
+  }
+
+  const toClose: vscode.Tab[] = [];
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input;
+      if (input instanceof vscode.TabInputText) {
+        if (state.openedFiles.has(input.uri.toString())) {
+          toClose.push(tab);
+        }
+      }
+    }
+  }
+
+  if (toClose.length > 0) {
+    await vscode.window.tabGroups.close(toClose, true);
+  }
+  state.openedFiles.clear();
 }
 
 export function deactivate() {}

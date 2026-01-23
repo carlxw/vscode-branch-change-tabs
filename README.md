@@ -23,6 +23,10 @@ These settings live under `branchTabs.*`:
 - `branchTabs.excludeRegexes` (array, default: `[]`)
   - Regex strings to exclude files from opening (matched against repo-relative paths).
   - Supports either `pattern` or `/pattern/flags` formats.
+- `branchTabs.maxFilesToOpen` (number, default: `10`)
+  - Aborts opening files when the number of changed files exceeds this limit.
+- `branchTabs.closeAllOnExcludedBranch` (boolean, default: `true`)
+  - Closes tabs previously opened by the extension when switching to an excluded branch.
 - `branchTabs.baseBranch` (string, default: `""`)
   - Optional base branch/ref to diff against. If empty, uses upstream if set; otherwise
   `main`/`master` when available.

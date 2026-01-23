@@ -51,6 +51,16 @@
             "type": "string"
           }
         },
+        "branchTabs.maxFilesToOpen": {
+          "type": "number",
+          "default": 10,
+          "description": "Abort opening files when the number of changed files exceeds this limit."
+        },
+        "branchTabs.closeAllOnExcludedBranch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Close tabs that were opened by the extension when switching to an excluded branch."
+        },
         "branchTabs.baseBranch": {
           "type": "string",
           "default": "",
