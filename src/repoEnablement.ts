@@ -21,7 +21,7 @@ export async function clearAllExtensionTrackedRepositories(): Promise<void> {
   }
 
   repositoryEnabledCache.clear();
-  const keys = extensionContext.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
+  const keys = extensionContext.globalState.keys().filter((key) => key.startsWith("repoDisabled:"));
   for (const key of keys) {
     await extensionContext.globalState.update(key, undefined);
   }
@@ -39,11 +39,11 @@ export async function isRepositoryEnabledOnInitialCheckout(
   }
 
   const key = repo.rootUri.fsPath;
-  if (settings.enabledRepositories.length > 0) {
+  if (settings.disabledRepositories.length > 0) {
     const normalized = new Set(
-      settings.enabledRepositories.map((entry) => entry.trim()).filter(Boolean)
+      settings.disabledRepositories.map((entry) => entry.trim()).filter(Boolean)
     );
-    const enabled = normalized.has(key);
+    const enabled = !normalized.has(key);
     repositoryEnabledCache.set(key, enabled);
 
     return enabled;
@@ -54,15 +54,15 @@ export async function isRepositoryEnabledOnInitialCheckout(
     return cached;
   }
 
-  const stored = extensionContext.globalState.get<boolean>(`repoEnabled:${key}`);
-  if (stored !== undefined) {
-    repositoryEnabledCache.set(key, stored);
-    return stored;
+  const storedDisabled = extensionContext.globalState.get<boolean>(`repoDisabled:${key}`);
+  if (storedDisabled !== undefined) {
+    const enabled = !storedDisabled;
+    repositoryEnabledCache.set(key, enabled);
+    return enabled;
   }
 
   if (!settings.promptOnNewRepository) {
     repositoryEnabledCache.set(key, true);
-    await extensionContext.globalState.update(`repoEnabled:${key}`, true);
     return true;
   }
 
@@ -78,20 +78,26 @@ export async function isRepositoryEnabledOnInitialCheckout(
   if (!choice) {
     return true;
   } else if (choice === "Don't Ask Again") {
+    return true;
+  }
+
+  if (choice === "Always Enable") {
     const config = vscode.workspace.getConfiguration("branchTabs");
     await config.update("promptOnNewRepository", false, true);
     repositoryEnabledCache.set(key, true);
-    await extensionContext.globalState.update(`repoEnabled:${key}`, true);
+    await extensionContext.globalState.update(`repoDisabled:${key}`, false);
     output.appendLine(
       "Disabled future repository prompts (branchTabs.promptOnNewRepository = false)."
     );
     return true;
   }
 
-  const enabled = choice === "Enable" || choice === "Always Enable";
+  const enabled = choice === "Enable";
   repositoryEnabledCache.set(key, enabled);
-  await extensionContext.globalState.update(`repoEnabled:${key}`, enabled);
-  if (!enabled) {
+  if (enabled) {
+    await extensionContext.globalState.update(`repoDisabled:${key}`, false);
+  } else {
+    await extensionContext.globalState.update(`repoDisabled:${key}`, true);
     output.appendLine(`Repository disabled by user: ${key}`);
   }
 

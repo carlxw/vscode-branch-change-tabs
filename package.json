@@ -146,10 +146,10 @@
           "default": true,
           "description": "Prompt to enable or disable the extension when a new repository is opened."
         },
-        "branchTabs.enabledRepositories": {
+        "branchTabs.disabledRepositories": {
           "type": "array",
           "default": [],
-          "description": "List of repository root paths where the extension is enabled. If non-empty, only these repositories are enabled.",
+          "description": "List of repository root paths where the extension is disabled.",
           "items": {
             "type": "string"
           }

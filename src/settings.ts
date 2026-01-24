@@ -8,8 +8,8 @@ export function getExtensionSettings(): ExtensionSEttings {
   const config = vscode.workspace.getConfiguration("branchTabs");
   const promptOnNewRepository =
     config.get<boolean>("promptOnNewRepository") ?? config.get<boolean>("promptOnNewRepo");
-  const enabledRepositories =
-    config.get<string[]>("enabledRepositories") ?? config.get<string[]>("enabledRepos");
+  const disabledRepositories =
+    config.get<string[]>("disabledRepositories") ?? config.get<string[]>("disabledRepos");
   const baseBranch = config.get<string>("baseBranch", "");
   const excludedBranches = config.get<string[]>("excludedBranches", ["main", "master"]);
   const includeModifiedFiles =
@@ -67,7 +67,7 @@ export function getExtensionSettings(): ExtensionSEttings {
     closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
     promptOnNewRepository: promptOnNewRepository ?? true,
-    enabledRepositories: enabledRepositories ?? [],
+    disabledRepositories: disabledRepositories ?? [],
     baseBranch
   };
 }

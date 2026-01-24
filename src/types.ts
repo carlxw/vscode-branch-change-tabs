@@ -51,6 +51,6 @@ export type ExtensionSEttings = {
   closePinnedTabsOnBranchChange: boolean;
   closeAllOnExcludedBranch: boolean;
   promptOnNewRepository: boolean;
-  enabledRepositories: string[];
+  disabledRepositories: string[];
   baseBranch: string;
 };

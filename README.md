@@ -43,8 +43,8 @@ These settings live under `branchTabs.*`:
   - Closes tabs previously opened by the extension when switching to an excluded branch.
 - `branchTabs.promptOnNewRepository` (boolean, default: `true`)
   - Prompt to enable or disable the extension when a new repository is opened.
-- `branchTabs.enabledRepositories` (array, default: `[]`)
-  - List of repository root paths where the extension is enabled. If non-empty, only these repositories are enabled.
+- `branchTabs.disabledRepositories` (array, default: `[]`)
+  - List of repository root paths where the extension is disabled.
 
 ## Commands
 - `Branch Change Tabs: Open Changed Files`
