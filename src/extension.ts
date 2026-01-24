@@ -29,6 +29,13 @@ interface Branch {
   upstream?: { name?: string };
 }
 
+type ChangeKind = "modified" | "added";
+
+type ChangedFile = {
+  path: string;
+  kind: ChangeKind;
+};
+
 type RepoState = {
   lastBranch?: string;
   pendingTimer?: NodeJS.Timeout;
@@ -136,9 +143,21 @@ async function handleRepositoryChange(repo: Repository) {
     return;
   }
 
-  output.appendLine(`Changed files found: ${changedFiles.length}`);
+  const selectableFiles = filterByChangeKind(changedFiles, settings.includeModified, settings.includeAdded);
+  if (!selectableFiles.length) {
+    output.appendLine("No files matched change-type filters.");
+    return;
+  }
 
-  const filteredFiles = filterExcluded(changedFiles, settings.excludeRegexes);
+  output.appendLine(`Changed files found: ${selectableFiles.length}`);
+
+  const filteredFiles = filterExcluded(
+    filterExcludedExtensions(
+      filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
+      settings.excludeExtensions
+    ),
+    settings.excludeRegexes
+  );
   if (!filteredFiles.length) {
     output.appendLine("All changed files were excluded by regex.");
     return;
@@ -146,21 +165,43 @@ async function handleRepositoryChange(repo: Repository) {
 
   output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
 
-  if (settings.maxFilesToOpen > 0 && filteredFiles.length > settings.maxFilesToOpen) {
+  let filesToConsider = filteredFiles;
+  if (settings.textFilesOnly) {
+    filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
+    output.appendLine(`Text files after filter: ${filesToConsider.length}`);
+    if (filesToConsider.length === 0) {
+      output.appendLine("No text files found for branch diff.");
+      return;
+    }
+  }
+
+  const maxToOpen = settings.maxFilesToOpen > 0 ? settings.maxFilesToOpen : Infinity;
+  if (settings.maxFilesToOpen > 0 && filesToConsider.length > settings.maxFilesToOpen) {
     output.appendLine(
-      `Aborting open: ${filteredFiles.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
+      `Limiting open: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
     );
-    return;
+    vscode.window.showWarningMessage(
+      `Branch Change Tabs: ${filesToConsider.length} files changed, opening up to ${settings.maxFilesToOpen} text files.`
+    );
+  }
+
+  // Always clear previously opened tabs from the extension when switching branches.
+  await closeOpenedFiles(state);
+
+  if (settings.closePinnedTabsOnBranchChange) {
+    await vscode.commands.executeCommand("workbench.action.closeAllPinnedEditors");
   }
 
   if (settings.closeAllBeforeOpen) {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   }
-  state.openedFiles.clear();
 
-  if (settings.pinOpenedTabs) {
-    for (const file of filteredFiles) {
-      const fileUri = vscode.Uri.file(path.join(repoRoot, file));
+  let openedCount = 0;
+  for (const file of filesToConsider) {
+      if (openedCount >= maxToOpen) {
+        break;
+      }
+      const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
       if (!(await fileExists(fileUri))) {
         continue;
       }
@@ -171,30 +212,20 @@ async function handleRepositoryChange(repo: Repository) {
           preserveFocus: false,
           viewColumn: vscode.ViewColumn.Active
         });
-        await vscode.commands.executeCommand("workbench.action.pinEditor");
+        const shouldPin =
+          file.kind === "modified" ? settings.pinModified : settings.pinAdded;
+        if (shouldPin) {
+          await vscode.commands.executeCommand("workbench.action.pinEditor");
+        }
         state.openedFiles.add(fileUri.toString());
+        openedCount += 1;
       } catch (error) {
-        output.appendLine(`Skipping non-text file "${file}": ${stringifyError(error)}`);
+        output.appendLine(`Skipping non-text file "${file.path}": ${stringifyError(error)}`);
       }
-    }
-  } else {
-    for (const file of filteredFiles) {
-      const fileUri = vscode.Uri.file(path.join(repoRoot, file));
-      if (!(await fileExists(fileUri))) {
-        continue;
-      }
-      try {
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(doc, {
-          preview: true,
-          preserveFocus: true,
-          viewColumn: vscode.ViewColumn.Active
-        });
-        state.openedFiles.add(fileUri.toString());
-      } catch (error) {
-        output.appendLine(`Skipping non-text file "${file}": ${stringifyError(error)}`);
-      }
-    }
+  }
+
+  if (openedCount === 0) {
+    output.appendLine("No text files were opened.");
   }
 }
 
@@ -207,8 +238,16 @@ function getSettings() {
     excludedBranches: config.get<string[]>("excludedBranches", ["main", "master"]),
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
     pinOpenedTabs: config.get<boolean>("pinOpenedTabs", true),
+    includeModified: config.get<boolean>("includeModified", true),
+    includeAdded: config.get<boolean>("includeAdded", true),
+    pinModified: config.get<boolean>("pinModified", config.get<boolean>("pinOpenedTabs", true)),
+    pinAdded: config.get<boolean>("pinAdded", config.get<boolean>("pinOpenedTabs", true)),
     excludeRegexes: config.get<string[]>("excludeRegexes", []),
     maxFilesToOpen: config.get<number>("maxFilesToOpen", 10),
+    textFilesOnly: config.get<boolean>("textFilesOnly", true),
+    excludeExtensions: config.get<string[]>("excludeExtensions", []),
+    excludeDirRegexes: config.get<string[]>("excludeDirRegexes", []),
+    closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
     baseBranch: config.get<string>("baseBranch", "")
   };
@@ -260,30 +299,120 @@ async function refExists(repoRoot: string, ref: string): Promise<boolean> {
 /**
  * Returns repo-relative file paths changed between base and head refs.
  */
-async function getChangedFiles(repoRoot: string, baseRef: string, headRef: string): Promise<string[]> {
+async function getChangedFiles(
+  repoRoot: string,
+  baseRef: string,
+  headRef: string
+): Promise<ChangedFile[]> {
   try {
-    const { stdout } = await execGit(repoRoot, ["diff", "--name-only", `${baseRef}...${headRef}`]);
+    const { stdout } = await execGit(repoRoot, ["diff", "--name-status", `${baseRef}...${headRef}`]);
     return stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .filter((line) => line.length > 0)
+      .map((line) => parseNameStatus(line))
+      .filter((entry): entry is ChangedFile => Boolean(entry));
   } catch (error) {
     output.appendLine(`Failed to diff ${baseRef}...${headRef}: ${stringifyError(error)}`);
     return [];
   }
 }
 
+function parseNameStatus(line: string): ChangedFile | undefined {
+  const parts = line.split(/\t+/);
+  const status = parts[0];
+  if (!status) {
+    return undefined;
+  }
+
+  if (status.startsWith("R") || status.startsWith("C")) {
+    const newPath = parts[2];
+    if (!newPath) {
+      return undefined;
+    }
+    return { path: newPath, kind: "modified" };
+  }
+
+  const filePath = parts[1];
+  if (!filePath) {
+    return undefined;
+  }
+
+  if (status === "A") {
+    return { path: filePath, kind: "added" };
+  }
+  if (status === "M") {
+    return { path: filePath, kind: "modified" };
+  }
+
+  return undefined;
+}
+
+function filterByChangeKind(
+  files: ChangedFile[],
+  includeModified: boolean,
+  includeAdded: boolean
+): ChangedFile[] {
+  if (includeModified && includeAdded) {
+    return files;
+  }
+  if (!includeModified && !includeAdded) {
+    return [];
+  }
+  return files.filter((file) => (includeModified ? file.kind === "modified" : file.kind === "added"));
+}
+
 /**
  * Filters files that match any of the configured exclude regexes.
  */
-function filterExcluded(files: string[], regexes: string[]): string[] {
+function filterExcluded(files: ChangedFile[], regexes: string[]): ChangedFile[] {
   const compiled = regexes
     .map((pattern) => parseRegex(pattern))
     .filter((regex): regex is RegExp => Boolean(regex));
   if (compiled.length === 0) {
     return files;
   }
-  return files.filter((file) => !compiled.some((regex) => regex.test(file)));
+  return files.filter((file) => !compiled.some((regex) => regex.test(file.path)));
+}
+
+/**
+ * Filters files whose repo-relative paths match any directory regex.
+ */
+function filterExcludedDirectories(files: ChangedFile[], dirRegexes: string[]): ChangedFile[] {
+  const compiled = dirRegexes
+    .map((pattern) => parseRegex(pattern))
+    .filter((regex): regex is RegExp => Boolean(regex));
+  if (compiled.length === 0) {
+    return files;
+  }
+  return files.filter((file) => !compiled.some((regex) => regex.test(file.path)));
+}
+
+/**
+ * Filters files that match any excluded extension (case-insensitive).
+ */
+function filterExcludedExtensions(files: ChangedFile[], extensions: string[]): ChangedFile[] {
+  if (!extensions.length) {
+    return files;
+  }
+  const normalized = new Set(
+    extensions
+      .map((ext) => ext.trim())
+      .filter((ext) => ext.length > 0)
+      .map((ext) => (ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`))
+  );
+  if (normalized.size === 0) {
+    return files;
+  }
+  return files.filter((file) => {
+    const lower = file.path.toLowerCase();
+    for (const ext of normalized) {
+      if (lower.endsWith(ext)) {
+        return false;
+      }
+    }
+    return true;
+  });
 }
 
 /**
@@ -325,6 +454,29 @@ async function fileExists(uri: vscode.Uri): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Filters out files that cannot be opened as text documents.
+ */
+async function filterTextFiles(
+  repoRoot: string,
+  files: ChangedFile[]
+): Promise<ChangedFile[]> {
+  const result: ChangedFile[] = [];
+  for (const file of files) {
+    const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
+    if (!(await fileExists(fileUri))) {
+      continue;
+    }
+    try {
+      await vscode.workspace.openTextDocument(fileUri);
+      result.push(file);
+    } catch (error) {
+      output.appendLine(`Skipping non-text file "${file.path}": ${stringifyError(error)}`);
+    }
+  }
+  return result;
 }
 
 /**

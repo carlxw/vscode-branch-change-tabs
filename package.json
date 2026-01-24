@@ -44,6 +44,26 @@
           "default": true,
           "description": "Pin editors opened by the extension (preview=false)."
         },
+        "branchTabs.includeModified": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open files that are modified relative to the base branch."
+        },
+        "branchTabs.includeAdded": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open files that are newly added relative to the base branch."
+        },
+        "branchTabs.pinModified": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pin modified files when opening."
+        },
+        "branchTabs.pinAdded": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pin newly added files when opening."
+        },
         "branchTabs.excludeRegexes": {
           "type": "array",
           "default": [],
@@ -55,7 +75,33 @@
         "branchTabs.maxFilesToOpen": {
           "type": "number",
           "default": 10,
-          "description": "Abort opening files when the number of changed files exceeds this limit."
+          "description": "Open up to this many text files when more are changed."
+        },
+        "branchTabs.textFilesOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only open text files (skip binary files)."
+        },
+        "branchTabs.excludeExtensions": {
+          "type": "array",
+          "default": [],
+          "description": "List of file extensions to skip when opening files (e.g., .pdf, .png).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branchTabs.excludeDirRegexes": {
+          "type": "array",
+          "default": [],
+          "description": "List of regex strings to exclude directories (matched against repo-relative paths).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branchTabs.closePinnedTabsOnBranchChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Close all pinned tabs when switching branches."
         },
         "branchTabs.closeAllOnExcludedBranch": {
           "type": "boolean",
