@@ -27,6 +27,14 @@
   },
 
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "branchTabs.changedFiles",
+          "name": "Branch Change Files"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "branchTabs.openChangedFiles",
