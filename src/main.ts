@@ -282,6 +282,9 @@ function parseNameStatus(line: string): ChangedFile | undefined {
   return undefined;
 }
 
+/**
+ * Filters files by change kind based on user settings.
+ */
 function filterByChangeKind(
   files: ChangedFile[],
   includeModified: boolean,
@@ -386,6 +389,9 @@ async function filterTextFiles(
   return result;
 }
 
+/**
+ * Prompts whether to open files when the max limit is exceeded.
+ */
 async function promptOpenWhenLimitExceeded(
   totalFiles: number,
   limit: number
@@ -398,6 +404,9 @@ async function promptOpenWhenLimitExceeded(
   return choice === "Open";
 }
 
+/**
+ * Optionally updates the maxFilesToOpen setting (workspace or user scope).
+ */
 async function maybeUpdateMaxFilesLimit(currentLimit: number): Promise<void> {
   const scopeChoice = await vscode.window.showInformationMessage(
     "Change the max files to open?",
@@ -475,6 +484,9 @@ async function closeOpenedFiles(state: RepoState) {
   state.openedFiles.clear();
 }
 
+/**
+ * Closes only pinned tabs that were opened by the extension.
+ */
 async function closePinnedOpenedFiles(state: RepoState) {
   if (state.openedFiles.size === 0) {
     return;
@@ -506,6 +518,9 @@ async function closePinnedOpenedFiles(state: RepoState) {
   }
 }
 
+/**
+ * Clears stored repo enable/disable decisions (dev helper).
+ */
 async function clearRepoDecisions(context: vscode.ExtensionContext): Promise<void> {
   repoEnabledCache.clear();
   const keys = context.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
@@ -514,6 +529,9 @@ async function clearRepoDecisions(context: vscode.ExtensionContext): Promise<voi
   }
 }
 
+/**
+ * Finds the active repository based on the current editor or first repo.
+ */
 function getActiveRepository(): Repository | undefined {
   const active = vscode.window.activeTextEditor?.document.uri;
   const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git")?.exports;
@@ -532,6 +550,9 @@ function getActiveRepository(): Repository | undefined {
   return git.repositories[0];
 }
 
+/**
+ * Opens changed files for a repository using current configuration.
+ */
 async function openChangedFilesForRepo(
   repo: Repository,
   options: { ignoreEnablement: boolean }
@@ -661,6 +682,9 @@ async function openChangedFilesForRepo(
   }
 }
 
+/**
+ * Closes pinned tabs in the active editor group.
+ */
 async function closePinnedTabsInActiveGroup(): Promise<void> {
   const group = vscode.window.tabGroups.activeTabGroup;
   const toClose = group.tabs.filter((tab) => tab.isPinned);
@@ -671,6 +695,9 @@ async function closePinnedTabsInActiveGroup(): Promise<void> {
   await vscode.window.tabGroups.close(toClose, true);
 }
 
+/**
+ * Ensures repo enablement state is known, prompting once if needed.
+ */
 async function ensureRepoEnabledOnFirstCheckout(
   repo: Repository,
   settings: ReturnType<typeof getSettings>
