@@ -160,6 +160,9 @@ function stringifyError(error: unknown): string {
   return String(error);
 }
 
+/**
+ * Runs git check-ignore with a null-delimited list of paths.
+ */
 async function runGitCheckIgnore(
   repoRoot: string,
   input: string

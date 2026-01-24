@@ -19,6 +19,9 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
 
   constructor(private readonly getRepository: () => Repository | undefined) {}
 
+  /**
+   * Signals the view to refresh, debounced to avoid rapid git calls.
+   */
   refresh(): void {
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
@@ -30,10 +33,16 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
     }, REFRESH_DEBOUNCE_MS);
   }
 
+  /**
+   * Returns the tree item used by VS Code for rendering.
+   */
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
   }
 
+  /**
+   * Loads the root children for the view.
+   */
   async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
     if (element) {
       return [];
@@ -91,6 +100,9 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
   }
 }
 
+/**
+ * Builds a tree item that opens a changed file.
+ */
 function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.TreeItem {
   const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
   const item = new vscode.TreeItem(file.path, vscode.TreeItemCollapsibleState.None);
@@ -105,6 +117,9 @@ function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.Tree
   return item;
 }
 
+/**
+ * Builds a non-clickable placeholder tree item.
+ */
 function createPlaceholderItem(label: string): vscode.TreeItem {
   const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
   item.iconPath = new vscode.ThemeIcon("info");
