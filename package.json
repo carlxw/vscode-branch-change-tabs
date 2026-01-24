@@ -2,7 +2,7 @@
   "name": "branch-change-tabs",
   "displayName": "Branch Change Tabs",
   "description": "Opens modified/newly-tracked files upon switching git branches.",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "carlxw.dev",
   "license": "All rights reserved.",
   "engines": {
