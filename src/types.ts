@@ -1,0 +1,56 @@
+import * as vscode from "vscode";
+
+export interface GitExtension {
+  getAPI(version: number): GitAPI;
+}
+
+export interface GitAPI {
+  repositories: Repository[];
+  onDidOpenRepository: vscode.Event<Repository>;
+}
+
+export interface Repository {
+  rootUri: vscode.Uri;
+  state: RepositoryState;
+}
+
+export interface RepositoryState {
+  HEAD?: Branch;
+  onDidChange: vscode.Event<void>;
+}
+
+export interface Branch {
+  name?: string;
+  upstream?: { name?: string };
+}
+
+export type ChangeKind = "modified" | "added";
+
+export type ChangedFile = {
+  path: string;
+  kind: ChangeKind;
+};
+
+export type RepoState = {
+  lastBranch?: string;
+  pendingTimer?: NodeJS.Timeout;
+  openedFiles: Set<string>;
+};
+
+export type Settings = {
+  excludedBranches: string[];
+  closeAllBeforeOpen: boolean;
+  includeModified: boolean;
+  includeAdded: boolean;
+  pinModified: boolean;
+  pinAdded: boolean;
+  excludedFiles: string[];
+  maxFilesToOpen: number;
+  textFilesOnly: boolean;
+  excludeDirRegexes: string[];
+  closePinnedTabsOnBranchChange: boolean;
+  closeAllOnExcludedBranch: boolean;
+  promptOnNewRepo: boolean;
+  enabledRepos: string[];
+  baseBranch: string;
+};
