@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { Repository } from "./types";
 import { output } from "./logger";
-import { getSettings } from "./settings";
-import { ensureRepositoryEnabledOnFirstCheckout } from "./repoEnablement";
+import { getExtensionSettings } from "./settings";
+import { ensureRepositoryEnabledOnFirstGitCheckout } from "./repoEnablement";
 import { resolveBaseRef, getChangedFiles } from "./gitDiff";
 import {
   filterByChangeKind,
@@ -12,23 +12,23 @@ import {
   filterGitIgnored,
   filterTextFiles
 } from "./filters";
-import { closeOpenedFiles, closePinnedOpenedFiles } from "./ui";
-import { ensureRepositoryState } from "./repoState";
+import { closeExtensionOpenedFiles, closeExtensionPinnedFiles } from "./ui";
+import { verifyRepositoryState } from "./repoState";
 
 /**
  * Opens changed files for a repository using current configuration.
  */
-export async function openChangedFilesForRepository(
+export async function openRepositoryChangedFiles(
   repo: Repository,
   options: { ignoreEnablement: boolean }
 ): Promise<void> {
-  const settings = getSettings();
+  const settings = getExtensionSettings();
   if (settings.excludedBranches.includes(repo.state.HEAD?.name ?? "")) {
     output.appendLine(`Branch "${repo.state.HEAD?.name}" excluded.`);
     return;
   }
   if (!options.ignoreEnablement) {
-    const enabled = await ensureRepositoryEnabledOnFirstCheckout(repo, settings);
+    const enabled = await ensureRepositoryEnabledOnFirstGitCheckout(repo, settings);
     if (!enabled) {
       output.appendLine(`Repository disabled by user: ${repo.rootUri.fsPath}`);
       return;
@@ -101,21 +101,47 @@ export async function openChangedFilesForRepository(
     output.appendLine(
       `Limit exceeded: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
     );
-    const shouldOpen = await promptOpenWhenLimitExceeded(
+    const shouldOpen = await promptWhenFileLimitExceeded(
       filesToConsider.length,
       settings.maxFilesToOpen
     );
     if (!shouldOpen) {
       return;
     }
-    await maybeUpdateMaxFilesLimit(settings.maxFilesToOpen);
+    const scopeChoice = await vscode.window.showInformationMessage(
+      "Change the max files to open?",
+      "No",
+      "This Workspace",
+      "User (Global)"
+    );
+
+    if (scopeChoice === "This Workspace" || scopeChoice === "User (Global)") {
+      const newValue = await vscode.window.showInputBox({
+        prompt: "Enter new maxFilesToOpen value",
+        value: String(settings.maxFilesToOpen),
+        validateInput: (value) => {
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+            return "Enter a whole number (0 or greater).";
+          }
+          return undefined;
+        }
+      });
+
+      if (newValue !== undefined) {
+        const parsed = Number(newValue);
+        const config = vscode.workspace.getConfiguration("branchTabs");
+        const isGlobal = scopeChoice === "User (Global)";
+        await config.update("maxFilesToOpen", parsed, isGlobal);
+      }
+    }
   }
 
-  const state = ensureRepositoryState(repo);
+  const state = verifyRepositoryState(repo);
   if (settings.closePinnedTabsOnBranchChange) {
-    await closePinnedOpenedFiles(state);
+    await closeExtensionPinnedFiles(state);
   } else {
-    await closeOpenedFiles(state);
+    await closeExtensionOpenedFiles(state);
   }
 
   if (settings.closeAllBeforeOpen) {
@@ -155,7 +181,7 @@ export async function openChangedFilesForRepository(
 /**
  * Prompts whether to open files when the max limit is exceeded.
  */
-async function promptOpenWhenLimitExceeded(
+async function promptWhenFileLimitExceeded(
   totalFiles: number,
   limit: number
 ): Promise<boolean> {
@@ -165,43 +191,6 @@ async function promptOpenWhenLimitExceeded(
     "Cancel"
   );
   return choice === "Open";
-}
-
-/**
- * Optionally updates the maxFilesToOpen setting (workspace or user scope).
- */
-async function maybeUpdateMaxFilesLimit(currentLimit: number): Promise<void> {
-  const scopeChoice = await vscode.window.showInformationMessage(
-    "Change the max files to open?",
-    "No",
-    "This Workspace",
-    "User (Global)"
-  );
-
-  if (scopeChoice !== "This Workspace" && scopeChoice !== "User (Global)") {
-    return;
-  }
-
-  const newValue = await vscode.window.showInputBox({
-    prompt: "Enter new maxFilesToOpen value",
-    value: String(currentLimit),
-    validateInput: (value) => {
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
-        return "Enter a whole number (0 or greater).";
-      }
-      return undefined;
-    }
-  });
-
-  if (newValue === undefined) {
-    return;
-  }
-
-  const parsed = Number(newValue);
-  const config = vscode.workspace.getConfiguration("branchTabs");
-  const isGlobal = scopeChoice === "User (Global)";
-  await config.update("maxFilesToOpen", parsed, isGlobal);
 }
 
 /**

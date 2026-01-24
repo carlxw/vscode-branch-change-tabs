@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Repository, Settings } from "./types";
+import { Repository, ExtensionSEttings } from "./types";
 import { output } from "./logger";
 
 const repositoryEnabledCache = new Map<string, boolean>();
@@ -29,9 +29,9 @@ export async function clearRepositoryDecisions(): Promise<void> {
 /**
  * Ensures repository enablement state is known, prompting once if needed.
  */
-export async function ensureRepositoryEnabledOnFirstCheckout(
+export async function ensureRepositoryEnabledOnFirstGitCheckout(
   repo: Repository,
-  settings: Settings
+  settings: ExtensionSEttings
 ): Promise<boolean> {
   if (!extensionContext) {
     return true;

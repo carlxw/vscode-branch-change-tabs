@@ -3,8 +3,8 @@ import { GitExtension } from "./types";
 import { output } from "./logger";
 import { initRepositoryEnablement, clearRepositoryDecisions } from "./repoEnablement";
 import { trackRepository } from "./repoWatcher";
-import { closePinnedTabsInActiveGroup, getActiveRepository } from "./ui";
-import { openChangedFilesForRepository } from "./openChangedFiles";
+import { closeAllPinnedTabsInActiveGroup, getActiveRepository } from "./ui";
+import { openRepositoryChangedFiles } from "./openChangedFiles";
 import { ChangedFilesView } from "./changedFilesView";
 
 const DEV_CLEAR_COMMAND = "branchTabs.dev.clearRepositoryDecisions";
@@ -77,7 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
       void vscode.window.showInformationMessage("Branch Change Tabs: no active repository found.");
       return;
     }
-    await openChangedFilesForRepository(repo, { ignoreEnablement: true });
+    await openRepositoryChangedFiles(repo, { ignoreEnablement: true });
     changedFilesView.refresh();
   });
   context.subscriptions.push(openChangedCommand);
@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext) {
   const closePinnedGroupCommand = vscode.commands.registerCommand(
     CLOSE_PINNED_GROUP_COMMAND,
     async () => {
-      await closePinnedTabsInActiveGroup();
+      await closeAllPinnedTabsInActiveGroup();
     }
   );
   context.subscriptions.push(closePinnedGroupCommand);

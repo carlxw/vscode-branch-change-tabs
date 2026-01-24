@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { Repository, ChangedFile } from "./types";
-import { getSettings } from "./settings";
+import { getExtensionSettings } from "./settings";
 import { resolveBaseRef, getChangedFiles } from "./gitDiff";
 import {
   filterByChangeKind,
@@ -53,7 +53,7 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return [createPlaceholderItem("No git repository detected.")];
     }
 
-    const settings = getSettings();
+    const settings = getExtensionSettings();
     const branchName = repo.state.HEAD?.name;
     if (!branchName) {
       return [createPlaceholderItem("No active branch detected.")];

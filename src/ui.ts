@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { RepositoryTrackingState, Repository } from "./types";
+import { GitRepositoryState, Repository } from "./types";
 
 /**
  * Closes tabs that were opened by the extension.
  */
-export async function closeOpenedFiles(state: RepositoryTrackingState): Promise<void> {
+export async function closeExtensionOpenedFiles(state: GitRepositoryState): Promise<void> {
   if (state.openedFiles.size === 0) {
     return;
   }
@@ -30,7 +30,7 @@ export async function closeOpenedFiles(state: RepositoryTrackingState): Promise<
 /**
  * Closes only pinned tabs that were opened by the extension.
  */
-export async function closePinnedOpenedFiles(state: RepositoryTrackingState): Promise<void> {
+export async function closeExtensionPinnedFiles(state: GitRepositoryState): Promise<void> {
   if (state.openedFiles.size === 0) {
     return;
   }
@@ -87,7 +87,7 @@ export function getActiveRepository(): Repository | undefined {
 /**
  * Closes pinned tabs in the active editor group.
  */
-export async function closePinnedTabsInActiveGroup(): Promise<void> {
+export async function closeAllPinnedTabsInActiveGroup(): Promise<void> {
   const group = vscode.window.tabGroups.activeTabGroup;
   const toClose = group.tabs.filter((tab) => tab.isPinned);
   if (toClose.length === 0) {

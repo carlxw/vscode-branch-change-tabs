@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { Settings } from "./types";
+import { ExtensionSEttings } from "./types";
 
 /**
  * Loads extension settings from the VS Code configuration.
  */
-export function getSettings(): Settings {
+export function getExtensionSettings(): ExtensionSEttings {
   const config = vscode.workspace.getConfiguration("branchTabs");
   const promptOnNewRepository =
     config.get<boolean>("promptOnNewRepository") ?? config.get<boolean>("promptOnNewRepo");

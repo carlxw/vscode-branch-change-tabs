@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import { Repository } from "./types";
 import { output } from "./logger";
-import { getSettings } from "./settings";
-import { ensureRepositoryEnabledOnFirstCheckout } from "./repoEnablement";
-import { ensureRepositoryState } from "./repoState";
-import { openChangedFilesForRepository } from "./openChangedFiles";
-import { closeOpenedFiles } from "./ui";
+import { getExtensionSettings } from "./settings";
+import { ensureRepositoryEnabledOnFirstGitCheckout } from "./repoEnablement";
+import { verifyRepositoryState } from "./repoState";
+import { openRepositoryChangedFiles } from "./openChangedFiles";
+import { closeExtensionOpenedFiles } from "./ui";
 
 const trackedRepositories = new Set<string>();
 
@@ -21,7 +21,7 @@ export async function trackRepository(
     return;
   }
   trackedRepositories.add(key);
-  const state = ensureRepositoryState(repo);
+  const state = verifyRepositoryState(repo);
 
   const subscription = repo.state.onDidChange(() => {
     if (state.pendingTimer) {
@@ -41,7 +41,7 @@ export async function trackRepository(
  */
 async function handleRepositoryChange(repo: Repository): Promise<void> {
   const key = repo.rootUri.fsPath;
-  const state = ensureRepositoryState(repo);
+  const state = verifyRepositoryState(repo);
 
   const currentBranch = repo.state.HEAD?.name;
   const previousBranch = state.lastBranch;
@@ -51,8 +51,8 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
     return;
   }
 
-  const settings = getSettings();
-  const enabled = await ensureRepositoryEnabledOnFirstCheckout(repo, settings);
+  const settings = getExtensionSettings();
+  const enabled = await ensureRepositoryEnabledOnFirstGitCheckout(repo, settings);
   if (!enabled) {
     output.appendLine(`Repository disabled by user: ${key}`);
     return;
@@ -60,11 +60,11 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
   if (settings.excludedBranches.includes(currentBranch)) {
     output.appendLine(`Branch "${currentBranch}" excluded.`);
     if (settings.closeAllOnExcludedBranch) {
-      await closeOpenedFiles(state);
+      await closeExtensionOpenedFiles(state);
     }
     return;
   }
 
   output.appendLine(`Branch changed: ${previousBranch ?? "(unknown)"} -> ${currentBranch}`);
-  await openChangedFilesForRepository(repo, { ignoreEnablement: false });
+  await openRepositoryChangedFiles(repo, { ignoreEnablement: false });
 }

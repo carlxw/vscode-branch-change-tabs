@@ -1,11 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { execFile, spawn } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import { ChangedFile } from "./types";
 import { output } from "./logger";
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Filters files by change kind based on user settings.

@@ -24,20 +24,20 @@ export interface Branch {
   upstream?: { name?: string };
 }
 
-export type ChangeKind = "modified" | "added";
+export type ChangeType = "modified" | "added";
 
 export type ChangedFile = {
   path: string;
-  kind: ChangeKind;
+  kind: ChangeType;
 };
 
-export type RepositoryTrackingState = {
+export type GitRepositoryState = {
   lastBranch?: string;
   pendingTimer?: NodeJS.Timeout;
   openedFiles: Set<string>;
 };
 
-export type Settings = {
+export type ExtensionSEttings = {
   excludedBranches: string[];
   closeAllBeforeOpen: boolean;
   includeModifiedFiles: boolean;
