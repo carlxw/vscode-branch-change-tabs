@@ -24,6 +24,7 @@ export async function closeExtensionOpenedFiles(state: GitRepositoryState): Prom
   if (toClose.length > 0) {
     await vscode.window.tabGroups.close(toClose, true);
   }
+
   state.openedFiles.clear();
 }
 
@@ -41,6 +42,7 @@ export async function closeExtensionPinnedFiles(state: GitRepositoryState): Prom
       if (!tab.isPinned) {
         continue;
       }
+
       const input = tab.input;
       if (input instanceof vscode.TabInputText) {
         if (state.openedFiles.has(input.uri.toString())) {
@@ -53,6 +55,7 @@ export async function closeExtensionPinnedFiles(state: GitRepositoryState): Prom
   if (toClose.length > 0) {
     await vscode.window.tabGroups.close(toClose, true);
   }
+
   for (const tab of toClose) {
     const input = tab.input;
     if (input instanceof vscode.TabInputText) {
@@ -64,7 +67,7 @@ export async function closeExtensionPinnedFiles(state: GitRepositoryState): Prom
 /**
  * Finds the active repository based on the current editor or first repo.
  */
-export function getActiveRepository(): Repository | undefined {
+export function getEditorActiveRepository(): Repository | undefined {
   const active = vscode.window.activeTextEditor?.document.uri;
   const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports as {
     getAPI(version: number): { repositories: Repository[] };
@@ -72,15 +75,18 @@ export function getActiveRepository(): Repository | undefined {
   if (!gitExtension) {
     return undefined;
   }
+
   const git = gitExtension.getAPI(1);
   if (active) {
     const match = git.repositories.find((repo) =>
       active.fsPath.toLowerCase().startsWith(repo.rootUri.fsPath.toLowerCase())
     );
+
     if (match) {
       return match;
     }
   }
+
   return git.repositories[0];
 }
 
@@ -94,5 +100,6 @@ export async function closeAllPinnedTabsInActiveGroup(): Promise<void> {
     void vscode.window.showInformationMessage("Branch Change Tabs: no pinned tabs in active group.");
     return;
   }
+
   await vscode.window.tabGroups.close(toClose, true);
 }

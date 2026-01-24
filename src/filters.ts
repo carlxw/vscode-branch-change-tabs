@@ -7,7 +7,7 @@ import { output } from "./logger";
 /**
  * Filters files by change kind based on user settings.
  */
-export function filterByChangeKind(
+export function filterByTypeOfChange(
   files: ChangedFile[],
   includeModified: boolean,
   includeAdded: boolean
@@ -24,7 +24,7 @@ export function filterByChangeKind(
 /**
  * Filters files that match any of the configured exclude regexes.
  */
-export function filterExcluded(files: ChangedFile[], regexes: string[]): ChangedFile[] {
+export function filterExcludedFiles(files: ChangedFile[], regexes: string[]): ChangedFile[] {
   const compiled = regexes
     .map((pattern) => parseRegex(pattern))
     .filter((regex): regex is RegExp => Boolean(regex));
@@ -57,7 +57,7 @@ export async function filterTextFiles(
   const result: ChangedFile[] = [];
   for (const file of files) {
     const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
-    if (!(await fileExists(fileUri))) {
+    if (!(await doesFileExist(fileUri))) {
       continue;
     }
     try {
@@ -73,7 +73,7 @@ export async function filterTextFiles(
 /**
  * Filters files ignored by git (honors .gitignore and related excludes).
  */
-export async function filterGitIgnored(
+export async function filterGitIgnoredFilesDirectories(
   repoRoot: string,
   files: ChangedFile[]
 ): Promise<ChangedFile[]> {
@@ -93,13 +93,10 @@ export async function filterGitIgnored(
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0)
     );
-    if (ignored.size === 0) {
+    if (exitCode === 1 || ignored.size) {
       return files;
     }
     return files.filter((file) => !ignored.has(file.path));
-    if (exitCode === 1) {
-      return files;
-    }
   } catch (error) {
     output.appendLine(`Failed to apply gitignore filters: ${stringifyError(error)}`);
     return files;
@@ -138,7 +135,7 @@ function parseRegex(value: string): RegExp | undefined {
 /**
  * Checks if a file exists on disk via the VS Code FS API.
  */
-async function fileExists(uri: vscode.Uri): Promise<boolean> {
+async function doesFileExist(uri: vscode.Uri): Promise<boolean> {
   try {
     await vscode.workspace.fs.stat(uri);
     return true;

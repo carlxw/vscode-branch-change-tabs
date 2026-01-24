@@ -1,3 +1,4 @@
 import * as vscode from "vscode";
 
-export const output = vscode.window.createOutputChannel("Branch Change Tabs");
+export const output =
+  vscode.window.createOutputChannel("Branch Change Tabs");

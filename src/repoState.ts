@@ -18,10 +18,12 @@ export function verifyRepositoryState(repo: Repository): GitRepositoryState {
   if (existing) {
     return existing;
   }
+
   const state: GitRepositoryState = {
     lastBranch: repo.state.HEAD?.name,
     openedFiles: new Set()
   };
   repositoryStates.set(key, state);
+
   return state;
 }

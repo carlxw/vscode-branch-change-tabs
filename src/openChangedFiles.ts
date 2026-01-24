@@ -3,13 +3,13 @@ import * as path from "path";
 import { Repository } from "./types";
 import { output } from "./logger";
 import { getExtensionSettings } from "./settings";
-import { ensureRepositoryEnabledOnFirstGitCheckout } from "./repoEnablement";
+import { isRepositoryEnabledOnInitialCheckout } from "./repoEnablement";
 import { resolveBaseRef, getChangedFiles } from "./gitDiff";
 import {
-  filterByChangeKind,
-  filterExcluded,
+  filterByTypeOfChange,
+  filterExcludedFiles,
   filterExcludedDirectories,
-  filterGitIgnored,
+  filterGitIgnoredFilesDirectories,
   filterTextFiles
 } from "./filters";
 import { closeExtensionOpenedFiles, closeExtensionPinnedFiles } from "./ui";
@@ -26,9 +26,8 @@ export async function openRepositoryChangedFiles(
   if (settings.excludedBranches.includes(repo.state.HEAD?.name ?? "")) {
     output.appendLine(`Branch "${repo.state.HEAD?.name}" excluded.`);
     return;
-  }
-  if (!options.ignoreEnablement) {
-    const enabled = await ensureRepositoryEnabledOnFirstGitCheckout(repo, settings);
+  } else if (!options.ignoreEnablement) {
+    const enabled = await isRepositoryEnabledOnInitialCheckout(repo, settings);
     if (!enabled) {
       output.appendLine(`Repository disabled by user: ${repo.rootUri.fsPath}`);
       return;
@@ -56,7 +55,7 @@ export async function openRepositoryChangedFiles(
     return;
   }
 
-  const selectableFiles = filterByChangeKind(
+  const selectableFiles = filterByTypeOfChange(
     changedFiles,
     settings.includeModifiedFiles,
     settings.includeNewlyTrackedFiles
@@ -68,7 +67,7 @@ export async function openRepositoryChangedFiles(
 
   output.appendLine(`Changed files found: ${selectableFiles.length}`);
 
-  const filteredFiles = filterExcluded(
+  const filteredFiles = filterExcludedFiles(
     filterExcludedDirectories(selectableFiles, settings.excludedDirectories),
     settings.excludedFiles
   );
@@ -77,7 +76,7 @@ export async function openRepositoryChangedFiles(
     return;
   }
 
-  const gitIgnoredFiltered = await filterGitIgnored(repoRoot, filteredFiles);
+  const gitIgnoredFiltered = await filterGitIgnoredFilesDirectories(repoRoot, filteredFiles);
   if (!gitIgnoredFiltered.length) {
     output.appendLine("All changed files were excluded by .gitignore.");
     return;
@@ -90,6 +89,7 @@ export async function openRepositoryChangedFiles(
   if (settings.textFilesOnly) {
     filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
     output.appendLine(`Text files after filter: ${filesToConsider.length}`);
+
     if (filesToConsider.length === 0) {
       output.appendLine("No text files found for branch diff.");
       return;
@@ -101,13 +101,14 @@ export async function openRepositoryChangedFiles(
     output.appendLine(
       `Limit exceeded: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
     );
-    const shouldOpen = await promptWhenFileLimitExceeded(
+    const shouldOpen = await promptUserOnFileLimitExceeded(
       filesToConsider.length,
       settings.maxFilesToOpen
     );
     if (!shouldOpen) {
       return;
     }
+
     const scopeChoice = await vscode.window.showInformationMessage(
       "Change the max files to open?",
       "No",
@@ -124,6 +125,7 @@ export async function openRepositoryChangedFiles(
           if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
             return "Enter a whole number (0 or greater).";
           }
+
           return undefined;
         }
       });
@@ -132,17 +134,16 @@ export async function openRepositoryChangedFiles(
         const parsed = Number(newValue);
         const config = vscode.workspace.getConfiguration("branchTabs");
         const isGlobal = scopeChoice === "User (Global)";
+
         await config.update("maxFilesToOpen", parsed, isGlobal);
       }
     }
   }
 
   const state = verifyRepositoryState(repo);
-  if (settings.closePinnedTabsOnBranchChange) {
-    await closeExtensionPinnedFiles(state);
-  } else {
-    await closeExtensionOpenedFiles(state);
-  }
+  settings.closePinnedTabsOnBranchChange
+    ? await closeExtensionPinnedFiles(state)
+    : await closeExtensionOpenedFiles(state);
 
   if (settings.closeAllBeforeOpen) {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
@@ -153,6 +154,7 @@ export async function openRepositoryChangedFiles(
     if (openedCount >= maxToOpen) {
       break;
     }
+
     const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
     try {
       const doc = await vscode.workspace.openTextDocument(fileUri);
@@ -161,6 +163,7 @@ export async function openRepositoryChangedFiles(
         preserveFocus: false,
         viewColumn: vscode.ViewColumn.Active
       });
+
       const shouldPin =
         file.kind === "modified" ? settings.pinModifiedFiles : settings.pinNewlyTrackedFiles;
       if (shouldPin) {
@@ -181,7 +184,7 @@ export async function openRepositoryChangedFiles(
 /**
  * Prompts whether to open files when the max limit is exceeded.
  */
-async function promptWhenFileLimitExceeded(
+async function promptUserOnFileLimitExceeded(
   totalFiles: number,
   limit: number
 ): Promise<boolean> {
@@ -190,6 +193,7 @@ async function promptWhenFileLimitExceeded(
     "Open",
     "Cancel"
   );
+
   return choice === "Open";
 }
 

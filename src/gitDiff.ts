@@ -18,10 +18,9 @@ export async function resolveBaseRef(
     return configuredBase.trim();
   }
 
-  if (await refExists(repoRoot, "main")) {
+  if (await doesRefExist(repoRoot, "main")) {
     return "main";
-  }
-  if (await refExists(repoRoot, "master")) {
+  } else if (await doesRefExist(repoRoot, "master")) {
     return "master";
   }
 
@@ -30,6 +29,7 @@ export async function resolveBaseRef(
     if (currentBranch && upstreamRef.endsWith(`/${currentBranch}`)) {
       return undefined;
     }
+
     return upstreamRef;
   }
 
@@ -39,7 +39,7 @@ export async function resolveBaseRef(
 /**
  * Checks whether a git ref exists in the repository.
  */
-export async function refExists(repoRoot: string, ref: string): Promise<boolean> {
+export async function doesRefExist(repoRoot: string, ref: string): Promise<boolean> {
   try {
     await execGit(repoRoot, ["rev-parse", "--verify", ref]);
     return true;
@@ -85,6 +85,7 @@ function parseNameStatus(line: string): ChangedFile | undefined {
     if (!newPath) {
       return undefined;
     }
+
     return { path: newPath, kind: "modified" };
   }
 
@@ -95,8 +96,7 @@ function parseNameStatus(line: string): ChangedFile | undefined {
 
   if (status === "A") {
     return { path: filePath, kind: "added" };
-  }
-  if (status === "M") {
+  } else if (status === "M") {
     return { path: filePath, kind: "modified" };
   }
 
@@ -117,5 +117,6 @@ function stringifyError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
+
   return String(error);
 }

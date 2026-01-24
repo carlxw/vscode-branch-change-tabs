@@ -8,17 +8,18 @@ let extensionContext: vscode.ExtensionContext | undefined;
 /**
  * Initializes enablement tracking with the extension context.
  */
-export function initRepositoryEnablement(context: vscode.ExtensionContext): void {
+export function initRepositoryTracking(context: vscode.ExtensionContext): void {
   extensionContext = context;
 }
 
 /**
  * Clears stored repository enable/disable decisions (dev helper).
  */
-export async function clearRepositoryDecisions(): Promise<void> {
+export async function clearAllExtensionTrackedRepositories(): Promise<void> {
   if (!extensionContext) {
     return;
   }
+
   repositoryEnabledCache.clear();
   const keys = extensionContext.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
   for (const key of keys) {
@@ -29,13 +30,14 @@ export async function clearRepositoryDecisions(): Promise<void> {
 /**
  * Ensures repository enablement state is known, prompting once if needed.
  */
-export async function ensureRepositoryEnabledOnFirstGitCheckout(
+export async function isRepositoryEnabledOnInitialCheckout(
   repo: Repository,
   settings: ExtensionSEttings
 ): Promise<boolean> {
   if (!extensionContext) {
     return true;
   }
+
   const key = repo.rootUri.fsPath;
   if (settings.enabledRepositories.length > 0) {
     const normalized = new Set(
@@ -43,8 +45,10 @@ export async function ensureRepositoryEnabledOnFirstGitCheckout(
     );
     const enabled = normalized.has(key);
     repositoryEnabledCache.set(key, enabled);
+
     return enabled;
   }
+
   const cached = repositoryEnabledCache.get(key);
   if (cached !== undefined) {
     return cached;
@@ -73,9 +77,7 @@ export async function ensureRepositoryEnabledOnFirstGitCheckout(
 
   if (!choice) {
     return true;
-  }
-
-  if (choice === "Don't Ask Again") {
+  } else if (choice === "Don't Ask Again") {
     const config = vscode.workspace.getConfiguration("branchTabs");
     await config.update("promptOnNewRepository", false, true);
     repositoryEnabledCache.set(key, true);
@@ -92,5 +94,6 @@ export async function ensureRepositoryEnabledOnFirstGitCheckout(
   if (!enabled) {
     output.appendLine(`Repository disabled by user: ${key}`);
   }
+
   return enabled;
 }

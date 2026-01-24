@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { Repository } from "./types";
 import { output } from "./logger";
 import { getExtensionSettings } from "./settings";
-import { ensureRepositoryEnabledOnFirstGitCheckout } from "./repoEnablement";
+import { isRepositoryEnabledOnInitialCheckout } from "./repoEnablement";
 import { verifyRepositoryState } from "./repoState";
 import { openRepositoryChangedFiles } from "./openChangedFiles";
 import { closeExtensionOpenedFiles } from "./ui";
@@ -52,7 +52,7 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
   }
 
   const settings = getExtensionSettings();
-  const enabled = await ensureRepositoryEnabledOnFirstGitCheckout(repo, settings);
+  const enabled = await isRepositoryEnabledOnInitialCheckout(repo, settings);
   if (!enabled) {
     output.appendLine(`Repository disabled by user: ${key}`);
     return;

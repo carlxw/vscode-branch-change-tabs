@@ -32,9 +32,11 @@ export function getExtensionSettings(): ExtensionSEttings {
       "^\\.next/"
     ];
   const normalizedBase = baseBranch.trim();
+
   if (normalizedBase.length > 0 && !excludedBranches.includes(normalizedBase)) {
     excludedBranches.push(normalizedBase);
   }
+
   return {
     excludedBranches,
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
