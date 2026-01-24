@@ -108,6 +108,19 @@
           "default": true,
           "description": "Close tabs that were opened by the extension when switching to an excluded branch."
         },
+        "branchTabs.promptOnNewRepo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prompt to enable or disable the extension when a new repository is opened."
+        },
+        "branchTabs.enabledRepos": {
+          "type": "array",
+          "default": [],
+          "description": "List of repository root paths where the extension is enabled. If non-empty, only these repos are enabled.",
+          "items": {
+            "type": "string"
+          }
+        },
         "branchTabs.baseBranch": {
           "type": "string",
           "default": "",

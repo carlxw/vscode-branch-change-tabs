@@ -44,11 +44,15 @@ type RepoState = {
 
 const repoStates = new Map<string, RepoState>();
 const output = vscode.window.createOutputChannel("Branch Change Tabs");
+const repoEnabledCache = new Map<string, boolean>();
+let extensionContext: vscode.ExtensionContext | undefined;
+const DEV_CLEAR_COMMAND = "branchTabs.dev.clearRepoDecisions";
 
 /**
  * Entry point for the extension; wires up git repository listeners.
  */
 export function activate(context: vscode.ExtensionContext) {
+  extensionContext = context;
   const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git")?.exports;
   if (!gitExtension) {
     output.appendLine("Git extension not found. Branch Change Tabs is inactive.");
@@ -58,18 +62,27 @@ export function activate(context: vscode.ExtensionContext) {
   const git = gitExtension.getAPI(1);
 
   for (const repo of git.repositories) {
-    trackRepository(repo, context);
+    void trackRepository(repo, context);
   }
 
   context.subscriptions.push(
-    git.onDidOpenRepository((repo) => trackRepository(repo, context))
+    git.onDidOpenRepository((repo) => void trackRepository(repo, context))
   );
+
+  if (context.extensionMode === vscode.ExtensionMode.Development) {
+    const clearCommand = vscode.commands.registerCommand(DEV_CLEAR_COMMAND, async () => {
+      await clearRepoDecisions(context);
+      output.appendLine("Cleared stored repo decisions (dev command).");
+      void vscode.window.showInformationMessage("Branch Change Tabs: cleared stored repo decisions.");
+    });
+    context.subscriptions.push(clearCommand);
+  }
 }
 
 /**
  * Registers listeners for a git repository and debounces state changes.
  */
-function trackRepository(repo: Repository, context: vscode.ExtensionContext) {
+async function trackRepository(repo: Repository, context: vscode.ExtensionContext) {
   const key = repo.rootUri.fsPath;
   if (repoStates.has(key)) {
     return;
@@ -113,6 +126,11 @@ async function handleRepositoryChange(repo: Repository) {
   }
 
   const settings = getSettings();
+  const enabled = await ensureRepoEnabledOnFirstCheckout(repo, settings);
+  if (!enabled) {
+    output.appendLine(`Repository disabled by user: ${key}`);
+    return;
+  }
   if (settings.excludedBranches.includes(currentBranch)) {
     output.appendLine(`Branch "${currentBranch}" excluded.`);
     if (settings.closeAllOnExcludedBranch) {
@@ -178,11 +196,16 @@ async function handleRepositoryChange(repo: Repository) {
   const maxToOpen = settings.maxFilesToOpen > 0 ? settings.maxFilesToOpen : Infinity;
   if (settings.maxFilesToOpen > 0 && filesToConsider.length > settings.maxFilesToOpen) {
     output.appendLine(
-      `Limiting open: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
+      `Limit exceeded: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
     );
-    vscode.window.showWarningMessage(
-      `Branch Change Tabs: ${filesToConsider.length} files changed, opening up to ${settings.maxFilesToOpen} text files.`
+    const shouldOpen = await promptOpenWhenLimitExceeded(
+      filesToConsider.length,
+      settings.maxFilesToOpen
     );
+    if (!shouldOpen) {
+      return;
+    }
+    await maybeUpdateMaxFilesLimit(settings.maxFilesToOpen);
   }
 
   // Always clear previously opened tabs from the extension when switching branches.
@@ -249,6 +272,8 @@ function getSettings() {
     excludeDirRegexes: config.get<string[]>("excludeDirRegexes", []),
     closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
+    promptOnNewRepo: config.get<boolean>("promptOnNewRepo", true),
+    enabledRepos: config.get<string[]>("enabledRepos", []),
     baseBranch: config.get<string>("baseBranch", "")
   };
 }
@@ -479,6 +504,52 @@ async function filterTextFiles(
   return result;
 }
 
+async function promptOpenWhenLimitExceeded(
+  totalFiles: number,
+  limit: number
+): Promise<boolean> {
+  const choice = await vscode.window.showWarningMessage(
+    `Branch Change Tabs: ${totalFiles} files changed, which exceeds the limit (${limit}). Open up to ${limit} files?`,
+    "Open",
+    "Cancel"
+  );
+  return choice === "Open";
+}
+
+async function maybeUpdateMaxFilesLimit(currentLimit: number): Promise<void> {
+  const scopeChoice = await vscode.window.showInformationMessage(
+    "Change the max files to open?",
+    "No",
+    "This Workspace",
+    "User (Global)"
+  );
+
+  if (scopeChoice !== "This Workspace" && scopeChoice !== "User (Global)") {
+    return;
+  }
+
+  const newValue = await vscode.window.showInputBox({
+    prompt: "Enter new maxFilesToOpen value",
+    value: String(currentLimit),
+    validateInput: (value) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+        return "Enter a whole number (0 or greater).";
+      }
+      return undefined;
+    }
+  });
+
+  if (newValue === undefined) {
+    return;
+  }
+
+  const parsed = Number(newValue);
+  const config = vscode.workspace.getConfiguration("branchTabs");
+  const isGlobal = scopeChoice === "User (Global)";
+  await config.update("maxFilesToOpen", parsed, isGlobal);
+}
+
 /**
  * Executes a git command in the repository root.
  */
@@ -520,6 +591,58 @@ async function closeOpenedFiles(state: RepoState) {
     await vscode.window.tabGroups.close(toClose, true);
   }
   state.openedFiles.clear();
+}
+
+async function clearRepoDecisions(context: vscode.ExtensionContext): Promise<void> {
+  repoEnabledCache.clear();
+  const keys = context.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
+  for (const key of keys) {
+    await context.globalState.update(key, undefined);
+  }
+}
+
+async function ensureRepoEnabledOnFirstCheckout(
+  repo: Repository,
+  settings: ReturnType<typeof getSettings>
+): Promise<boolean> {
+  if (!extensionContext) {
+    return true;
+  }
+  const key = repo.rootUri.fsPath;
+  if (settings.enabledRepos.length > 0) {
+    const normalized = new Set(settings.enabledRepos.map((entry) => entry.trim()).filter(Boolean));
+    const enabled = normalized.has(key);
+    repoEnabledCache.set(key, enabled);
+    return enabled;
+  }
+  const cached = repoEnabledCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const stored = extensionContext.globalState.get<boolean>(`repoEnabled:${key}`);
+  if (stored !== undefined) {
+    repoEnabledCache.set(key, stored);
+    return stored;
+  }
+
+  if (!settings.promptOnNewRepo) {
+    repoEnabledCache.set(key, true);
+    await extensionContext.globalState.update(`repoEnabled:${key}`, true);
+    return true;
+  }
+
+  const choice = await vscode.window.showInformationMessage(
+    "Enable Branch Change Tabs for this repository?",
+    { modal: true, detail: key },
+    "Enable",
+    "Disable"
+  );
+
+  const enabled = choice === "Enable";
+  repoEnabledCache.set(key, enabled);
+  await extensionContext.globalState.update(`repoEnabled:${key}`, enabled);
+  return enabled;
 }
 
 /**

@@ -42,6 +42,10 @@ These settings live under `branchTabs.*`:
   - Closes all pinned tabs when switching branches (uses VS Code command).
 - `branchTabs.closeAllOnExcludedBranch` (boolean, default: `true`)
   - Closes tabs previously opened by the extension when switching to an excluded branch.
+- `branchTabs.promptOnNewRepo` (boolean, default: `true`)
+  - Prompt to enable or disable the extension when a new repository is opened.
+- `branchTabs.enabledRepos` (array, default: `[]`)
+  - List of repository root paths where the extension is enabled. If non-empty, only these repos are enabled.
 - `branchTabs.baseBranch` (string, default: `""`)
   - Optional base branch/ref to diff against. If empty, uses upstream if set; otherwise
   `main`/`master` when available.
