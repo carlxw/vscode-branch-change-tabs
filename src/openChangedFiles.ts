@@ -3,7 +3,7 @@ import * as path from "path";
 import { Repository } from "./types";
 import { output } from "./logger";
 import { getSettings } from "./settings";
-import { ensureRepoEnabledOnFirstCheckout } from "./repoEnablement";
+import { ensureRepositoryEnabledOnFirstCheckout } from "./repoEnablement";
 import { resolveBaseRef, getChangedFiles } from "./gitDiff";
 import {
   filterByChangeKind,
@@ -12,12 +12,12 @@ import {
   filterTextFiles
 } from "./filters";
 import { closeOpenedFiles, closePinnedOpenedFiles } from "./ui";
-import { ensureRepoState } from "./repoState";
+import { ensureRepositoryState } from "./repoState";
 
 /**
  * Opens changed files for a repository using current configuration.
  */
-export async function openChangedFilesForRepo(
+export async function openChangedFilesForRepository(
   repo: Repository,
   options: { ignoreEnablement: boolean }
 ): Promise<void> {
@@ -27,7 +27,7 @@ export async function openChangedFilesForRepo(
     return;
   }
   if (!options.ignoreEnablement) {
-    const enabled = await ensureRepoEnabledOnFirstCheckout(repo, settings);
+    const enabled = await ensureRepositoryEnabledOnFirstCheckout(repo, settings);
     if (!enabled) {
       output.appendLine(`Repository disabled by user: ${repo.rootUri.fsPath}`);
       return;
@@ -99,7 +99,7 @@ export async function openChangedFilesForRepo(
     await maybeUpdateMaxFilesLimit(settings.maxFilesToOpen);
   }
 
-  const state = ensureRepoState(repo);
+  const state = ensureRepositoryState(repo);
   if (settings.closePinnedTabsOnBranchChange) {
     await closePinnedOpenedFiles(state);
   } else {

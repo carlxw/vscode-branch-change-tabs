@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { RepoState, Repository } from "./types";
+import { RepositoryTrackingState, Repository } from "./types";
 
 /**
  * Closes tabs that were opened by the extension.
  */
-export async function closeOpenedFiles(state: RepoState): Promise<void> {
+export async function closeOpenedFiles(state: RepositoryTrackingState): Promise<void> {
   if (state.openedFiles.size === 0) {
     return;
   }
@@ -30,7 +30,7 @@ export async function closeOpenedFiles(state: RepoState): Promise<void> {
 /**
  * Closes only pinned tabs that were opened by the extension.
  */
-export async function closePinnedOpenedFiles(state: RepoState): Promise<void> {
+export async function closePinnedOpenedFiles(state: RepositoryTrackingState): Promise<void> {
   if (state.openedFiles.size === 0) {
     return;
   }

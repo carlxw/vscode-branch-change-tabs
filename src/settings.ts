@@ -6,6 +6,10 @@ import { Settings } from "./types";
  */
 export function getSettings(): Settings {
   const config = vscode.workspace.getConfiguration("branchTabs");
+  const promptOnNewRepository =
+    config.get<boolean>("promptOnNewRepository") ?? config.get<boolean>("promptOnNewRepo");
+  const enabledRepositories =
+    config.get<string[]>("enabledRepositories") ?? config.get<string[]>("enabledRepos");
   return {
     excludedBranches: config.get<string[]>("excludedBranches", ["main", "master"]),
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
@@ -19,8 +23,8 @@ export function getSettings(): Settings {
     excludeDirRegexes: config.get<string[]>("excludeDirRegexes", []),
     closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
-    promptOnNewRepo: config.get<boolean>("promptOnNewRepo", true),
-    enabledRepos: config.get<string[]>("enabledRepos", []),
+    promptOnNewRepository: promptOnNewRepository ?? true,
+    enabledRepositories: enabledRepositories ?? [],
     baseBranch: config.get<string>("baseBranch", "")
   };
 }

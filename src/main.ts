@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 import { GitExtension } from "./types";
 import { output } from "./logger";
-import { initRepoEnablement, clearRepoDecisions } from "./repoEnablement";
+import { initRepositoryEnablement, clearRepositoryDecisions } from "./repoEnablement";
 import { trackRepository } from "./repoWatcher";
 import { closePinnedTabsInActiveGroup, getActiveRepository } from "./ui";
-import { openChangedFilesForRepo } from "./openChangedFiles";
+import { openChangedFilesForRepository } from "./openChangedFiles";
 import { ChangedFilesView } from "./changedFilesView";
 
-const DEV_CLEAR_COMMAND = "branchTabs.dev.clearRepoDecisions";
+const DEV_CLEAR_COMMAND = "branchTabs.dev.clearRepositoryDecisions";
 const OPEN_CHANGED_COMMAND = "branchTabs.openChangedFiles";
 const CLOSE_PINNED_GROUP_COMMAND = "branchTabs.closePinnedTabsInGroup";
 
@@ -15,7 +15,7 @@ const CLOSE_PINNED_GROUP_COMMAND = "branchTabs.closePinnedTabsInGroup";
  * Entry point for the extension; wires up git repository listeners.
  */
 export function activate(context: vscode.ExtensionContext) {
-  initRepoEnablement(context);
+  initRepositoryEnablement(context);
   const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git")?.exports;
   if (!gitExtension) {
     output.appendLine("Git extension not found. Branch Change Tabs is inactive.");
@@ -62,9 +62,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   if (context.extensionMode === vscode.ExtensionMode.Development) {
     const clearCommand = vscode.commands.registerCommand(DEV_CLEAR_COMMAND, async () => {
-      await clearRepoDecisions();
-      output.appendLine("Cleared stored repo decisions (dev command).");
-      void vscode.window.showInformationMessage("Branch Change Tabs: cleared stored repo decisions.");
+      await clearRepositoryDecisions();
+      output.appendLine("Cleared stored repository decisions (dev command).");
+      void vscode.window.showInformationMessage(
+        "Branch Change Tabs: cleared stored repository decisions."
+      );
     });
     context.subscriptions.push(clearCommand);
   }
@@ -75,7 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
       void vscode.window.showInformationMessage("Branch Change Tabs: no active repository found.");
       return;
     }
-    await openChangedFilesForRepo(repo, { ignoreEnablement: true });
+    await openChangedFilesForRepository(repo, { ignoreEnablement: true });
     changedFilesView.refresh();
   });
   context.subscriptions.push(openChangedCommand);

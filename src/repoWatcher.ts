@@ -2,12 +2,12 @@ import * as vscode from "vscode";
 import { Repository } from "./types";
 import { output } from "./logger";
 import { getSettings } from "./settings";
-import { ensureRepoEnabledOnFirstCheckout } from "./repoEnablement";
-import { ensureRepoState } from "./repoState";
-import { openChangedFilesForRepo } from "./openChangedFiles";
+import { ensureRepositoryEnabledOnFirstCheckout } from "./repoEnablement";
+import { ensureRepositoryState } from "./repoState";
+import { openChangedFilesForRepository } from "./openChangedFiles";
 import { closeOpenedFiles } from "./ui";
 
-const trackedRepos = new Set<string>();
+const trackedRepositories = new Set<string>();
 
 /**
  * Registers listeners for a git repository and debounces state changes.
@@ -17,11 +17,11 @@ export async function trackRepository(
   context: vscode.ExtensionContext
 ): Promise<void> {
   const key = repo.rootUri.fsPath;
-  if (trackedRepos.has(key)) {
+  if (trackedRepositories.has(key)) {
     return;
   }
-  trackedRepos.add(key);
-  const state = ensureRepoState(repo);
+  trackedRepositories.add(key);
+  const state = ensureRepositoryState(repo);
 
   const subscription = repo.state.onDidChange(() => {
     if (state.pendingTimer) {
@@ -41,7 +41,7 @@ export async function trackRepository(
  */
 async function handleRepositoryChange(repo: Repository): Promise<void> {
   const key = repo.rootUri.fsPath;
-  const state = ensureRepoState(repo);
+  const state = ensureRepositoryState(repo);
 
   const currentBranch = repo.state.HEAD?.name;
   const previousBranch = state.lastBranch;
@@ -52,7 +52,7 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
   }
 
   const settings = getSettings();
-  const enabled = await ensureRepoEnabledOnFirstCheckout(repo, settings);
+  const enabled = await ensureRepositoryEnabledOnFirstCheckout(repo, settings);
   if (!enabled) {
     output.appendLine(`Repository disabled by user: ${key}`);
     return;
@@ -66,5 +66,5 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
   }
 
   output.appendLine(`Branch changed: ${previousBranch ?? "(unknown)"} -> ${currentBranch}`);
-  await openChangedFilesForRepo(repo, { ignoreEnablement: false });
+  await openChangedFilesForRepository(repo, { ignoreEnablement: false });
 }

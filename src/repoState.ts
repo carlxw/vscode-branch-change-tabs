@@ -1,27 +1,27 @@
-import { RepoState, Repository } from "./types";
+import { RepositoryTrackingState, Repository } from "./types";
 
-const repoStates = new Map<string, RepoState>();
+const repositoryStates = new Map<string, RepositoryTrackingState>();
 
 /**
- * Returns tracked repo state if it exists.
+ * Returns tracked repository state if it exists.
  */
-export function getRepoState(repoRoot: string): RepoState | undefined {
-  return repoStates.get(repoRoot);
+export function getRepositoryState(repoRoot: string): RepositoryTrackingState | undefined {
+  return repositoryStates.get(repoRoot);
 }
 
 /**
- * Ensures repo state is initialized and returns it.
+ * Ensures repository state is initialized and returns it.
  */
-export function ensureRepoState(repo: Repository): RepoState {
+export function ensureRepositoryState(repo: Repository): RepositoryTrackingState {
   const key = repo.rootUri.fsPath;
-  const existing = repoStates.get(key);
+  const existing = repositoryStates.get(key);
   if (existing) {
     return existing;
   }
-  const state: RepoState = {
+  const state: RepositoryTrackingState = {
     lastBranch: repo.state.HEAD?.name,
     openedFiles: new Set()
   };
-  repoStates.set(key, state);
+  repositoryStates.set(key, state);
   return state;
 }

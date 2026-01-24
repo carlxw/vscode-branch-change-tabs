@@ -120,15 +120,15 @@
           "default": true,
           "description": "Close tabs that were opened by the extension when switching to an ignored branch."
         },
-        "branchTabs.promptOnNewRepo": {
+        "branchTabs.promptOnNewRepository": {
           "type": "boolean",
           "default": true,
           "description": "Prompt to enable or disable the extension when a new repository is opened."
         },
-        "branchTabs.enabledRepos": {
+        "branchTabs.enabledRepositories": {
           "type": "array",
           "default": [],
-          "description": "List of repository root paths where the extension is enabled. If non-empty, only these repos are enabled.",
+          "description": "List of repository root paths where the extension is enabled. If non-empty, only these repositories are enabled.",
           "items": {
             "type": "string"
           }
@@ -136,7 +136,7 @@
         "branchTabs.baseBranch": {
           "type": "string",
           "default": "",
-          "description": "Optional base branch/ref to diff against. If empty, uses upstream if set, otherwise main/master when available."
+          "description": "Optional base branch/ref to diff against. If empty, uses upstream if set, otherwise main/master will be used."
         }
       }
     }

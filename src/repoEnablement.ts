@@ -2,24 +2,24 @@ import * as vscode from "vscode";
 import { Repository, Settings } from "./types";
 import { output } from "./logger";
 
-const repoEnabledCache = new Map<string, boolean>();
+const repositoryEnabledCache = new Map<string, boolean>();
 let extensionContext: vscode.ExtensionContext | undefined;
 
 /**
  * Initializes enablement tracking with the extension context.
  */
-export function initRepoEnablement(context: vscode.ExtensionContext): void {
+export function initRepositoryEnablement(context: vscode.ExtensionContext): void {
   extensionContext = context;
 }
 
 /**
- * Clears stored repo enable/disable decisions (dev helper).
+ * Clears stored repository enable/disable decisions (dev helper).
  */
-export async function clearRepoDecisions(): Promise<void> {
+export async function clearRepositoryDecisions(): Promise<void> {
   if (!extensionContext) {
     return;
   }
-  repoEnabledCache.clear();
+  repositoryEnabledCache.clear();
   const keys = extensionContext.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
   for (const key of keys) {
     await extensionContext.globalState.update(key, undefined);
@@ -27,9 +27,9 @@ export async function clearRepoDecisions(): Promise<void> {
 }
 
 /**
- * Ensures repo enablement state is known, prompting once if needed.
+ * Ensures repository enablement state is known, prompting once if needed.
  */
-export async function ensureRepoEnabledOnFirstCheckout(
+export async function ensureRepositoryEnabledOnFirstCheckout(
   repo: Repository,
   settings: Settings
 ): Promise<boolean> {
@@ -37,25 +37,27 @@ export async function ensureRepoEnabledOnFirstCheckout(
     return true;
   }
   const key = repo.rootUri.fsPath;
-  if (settings.enabledRepos.length > 0) {
-    const normalized = new Set(settings.enabledRepos.map((entry) => entry.trim()).filter(Boolean));
+  if (settings.enabledRepositories.length > 0) {
+    const normalized = new Set(
+      settings.enabledRepositories.map((entry) => entry.trim()).filter(Boolean)
+    );
     const enabled = normalized.has(key);
-    repoEnabledCache.set(key, enabled);
+    repositoryEnabledCache.set(key, enabled);
     return enabled;
   }
-  const cached = repoEnabledCache.get(key);
+  const cached = repositoryEnabledCache.get(key);
   if (cached !== undefined) {
     return cached;
   }
 
   const stored = extensionContext.globalState.get<boolean>(`repoEnabled:${key}`);
   if (stored !== undefined) {
-    repoEnabledCache.set(key, stored);
+    repositoryEnabledCache.set(key, stored);
     return stored;
   }
 
-  if (!settings.promptOnNewRepo) {
-    repoEnabledCache.set(key, true);
+  if (!settings.promptOnNewRepository) {
+    repositoryEnabledCache.set(key, true);
     await extensionContext.globalState.update(`repoEnabled:${key}`, true);
     return true;
   }
@@ -75,15 +77,17 @@ export async function ensureRepoEnabledOnFirstCheckout(
 
   if (choice === "Don't Ask Again") {
     const config = vscode.workspace.getConfiguration("branchTabs");
-    await config.update("promptOnNewRepo", false, true);
-    repoEnabledCache.set(key, true);
+    await config.update("promptOnNewRepository", false, true);
+    repositoryEnabledCache.set(key, true);
     await extensionContext.globalState.update(`repoEnabled:${key}`, true);
-    output.appendLine("Disabled future repo prompts (branchTabs.promptOnNewRepo = false).");
+    output.appendLine(
+      "Disabled future repository prompts (branchTabs.promptOnNewRepository = false)."
+    );
     return true;
   }
 
   const enabled = choice === "Enable" || choice === "Always Enable";
-  repoEnabledCache.set(key, enabled);
+  repositoryEnabledCache.set(key, enabled);
   await extensionContext.globalState.update(`repoEnabled:${key}`, enabled);
   if (!enabled) {
     output.appendLine(`Repository disabled by user: ${key}`);

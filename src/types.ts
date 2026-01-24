@@ -31,7 +31,7 @@ export type ChangedFile = {
   kind: ChangeKind;
 };
 
-export type RepoState = {
+export type RepositoryTrackingState = {
   lastBranch?: string;
   pendingTimer?: NodeJS.Timeout;
   openedFiles: Set<string>;
@@ -50,7 +50,7 @@ export type Settings = {
   excludeDirRegexes: string[];
   closePinnedTabsOnBranchChange: boolean;
   closeAllOnExcludedBranch: boolean;
-  promptOnNewRepo: boolean;
-  enabledRepos: string[];
+  promptOnNewRepository: boolean;
+  enabledRepositories: string[];
   baseBranch: string;
 };
