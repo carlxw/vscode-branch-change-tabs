@@ -171,15 +171,13 @@ function getSettings() {
   return {
     excludedBranches: config.get<string[]>("excludedBranches", ["main", "master"]),
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
-    pinOpenedTabs: config.get<boolean>("pinOpenedTabs", true),
     includeModified: config.get<boolean>("includeModified", true),
     includeAdded: config.get<boolean>("includeAdded", true),
-    pinModified: config.get<boolean>("pinModified", config.get<boolean>("pinOpenedTabs", true)),
-    pinAdded: config.get<boolean>("pinAdded", config.get<boolean>("pinOpenedTabs", true)),
-    excludeRegexes: config.get<string[]>("excludeRegexes", []),
+    pinModified: config.get<boolean>("pinModified", true),
+    pinAdded: config.get<boolean>("pinAdded", true),
+    excludedFiles: config.get<string[]>("excludedFiles", []),
     maxFilesToOpen: config.get<number>("maxFilesToOpen", 10),
     textFilesOnly: config.get<boolean>("textFilesOnly", true),
-    excludeExtensions: config.get<string[]>("excludeExtensions", []),
     excludeDirRegexes: config.get<string[]>("excludeDirRegexes", []),
     closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
@@ -322,33 +320,6 @@ function filterExcludedDirectories(files: ChangedFile[], dirRegexes: string[]): 
     return files;
   }
   return files.filter((file) => !compiled.some((regex) => regex.test(file.path)));
-}
-
-/**
- * Filters files that match any excluded extension (case-insensitive).
- */
-function filterExcludedExtensions(files: ChangedFile[], extensions: string[]): ChangedFile[] {
-  if (!extensions.length) {
-    return files;
-  }
-  const normalized = new Set(
-    extensions
-      .map((ext) => ext.trim())
-      .filter((ext) => ext.length > 0)
-      .map((ext) => (ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`))
-  );
-  if (normalized.size === 0) {
-    return files;
-  }
-  return files.filter((file) => {
-    const lower = file.path.toLowerCase();
-    for (const ext of normalized) {
-      if (lower.endsWith(ext)) {
-        return false;
-      }
-    }
-    return true;
-  });
 }
 
 /**
@@ -504,6 +475,37 @@ async function closeOpenedFiles(state: RepoState) {
   state.openedFiles.clear();
 }
 
+async function closePinnedOpenedFiles(state: RepoState) {
+  if (state.openedFiles.size === 0) {
+    return;
+  }
+
+  const toClose: vscode.Tab[] = [];
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      if (!tab.isPinned) {
+        continue;
+      }
+      const input = tab.input;
+      if (input instanceof vscode.TabInputText) {
+        if (state.openedFiles.has(input.uri.toString())) {
+          toClose.push(tab);
+        }
+      }
+    }
+  }
+
+  if (toClose.length > 0) {
+    await vscode.window.tabGroups.close(toClose, true);
+  }
+  for (const tab of toClose) {
+    const input = tab.input;
+    if (input instanceof vscode.TabInputText) {
+      state.openedFiles.delete(input.uri.toString());
+    }
+  }
+}
+
 async function clearRepoDecisions(context: vscode.ExtensionContext): Promise<void> {
   repoEnabledCache.clear();
   const keys = context.globalState.keys().filter((key) => key.startsWith("repoEnabled:"));
@@ -577,11 +579,8 @@ async function openChangedFilesForRepo(
   output.appendLine(`Changed files found: ${selectableFiles.length}`);
 
   const filteredFiles = filterExcluded(
-    filterExcludedExtensions(
-      filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
-      settings.excludeExtensions
-    ),
-    settings.excludeRegexes
+    filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
+    settings.excludedFiles
   );
   if (!filteredFiles.length) {
     output.appendLine("All changed files were excluded by regex.");
@@ -617,11 +616,11 @@ async function openChangedFilesForRepo(
 
   const state = repoStates.get(repoRoot);
   if (state) {
-    await closeOpenedFiles(state);
-  }
-
-  if (settings.closePinnedTabsOnBranchChange) {
-    await vscode.commands.executeCommand("workbench.action.closeAllPinnedEditors");
+    if (settings.closePinnedTabsOnBranchChange) {
+      await closePinnedOpenedFiles(state);
+    } else {
+      await closeOpenedFiles(state);
+    }
   }
 
   if (settings.closeAllBeforeOpen) {
