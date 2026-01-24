@@ -3,6 +3,9 @@
 Open all files that were changed on the current git branch whenever you switch branches
 (excluding configured branches like `main`/`master`).
 
+Note: This extension is not recommended to be used in branches that modifies many 
+(more than 10) files at once. 
+
 ## What it does
 - Detects git branch switches in the current repository.
 - Diffs the current branch against a base ref (upstream if set; otherwise `main`/`master`).
@@ -55,15 +58,6 @@ These settings live under `branchTabs.*`:
   - Optional base branch/ref to diff against. If empty, uses upstream if set; otherwise
   `main`/`master` when available.
 
-## How to test locally (Extension Development Host)
-1. Open this folder in VS Code.
-2. Run `npm install`.
-3. Run `npm run build`.
-4. Press `F5` to start an Extension Development Host.
-5. In the new VS Code window, open a git repo and switch branches:
-   - `git switch <branch>` or `git checkout <branch>`
-   - The extension should open all files changed on that branch.
-
 ## Notes
-- The extension triggers only on branch change events (not on VS Code startup).
+- This extension triggers only on branch change events (not on VS Code startup).
 - Output logs are available in the Output panel under **Branch Change Tabs**.
