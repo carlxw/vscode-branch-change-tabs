@@ -74,10 +74,6 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       settings.includeModifiedFiles,
       settings.includeNewlyTrackedFiles
     );
-    if (!filteredFiles.length) {
-      return [createPlaceholderItem("All changes filtered by settings.")];
-    }
-
     const filteredFiles = filterExcluded(
       filterExcludedDirectories(selectableFiles, settings.excludedDirectories),
       settings.excludedFiles

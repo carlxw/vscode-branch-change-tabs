@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { ChangedFile } from "./types";
 import { output } from "./logger";
@@ -86,11 +86,7 @@ export async function filterGitIgnored(
 
   const input = files.map((file) => file.path).join("\0") + "\0";
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["check-ignore", "-z", "--stdin"],
-      { cwd: repoRoot, windowsHide: true, input }
-    );
+    const { stdout, exitCode } = await runGitCheckIgnore(repoRoot, input);
     if (!stdout) {
       return files;
     }
@@ -104,14 +100,10 @@ export async function filterGitIgnored(
       return files;
     }
     return files.filter((file) => !ignored.has(file.path));
-  } catch (error) {
-    const exitCode =
-      typeof (error as { code?: number }).code === "number"
-        ? (error as { code: number }).code
-        : undefined;
     if (exitCode === 1) {
       return files;
     }
+  } catch (error) {
     output.appendLine(`Failed to apply gitignore filters: ${stringifyError(error)}`);
     return files;
   }
@@ -166,4 +158,42 @@ function stringifyError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function runGitCheckIgnore(
+  repoRoot: string,
+  input: string
+): Promise<{ stdout: string; exitCode: number | null }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", ["check-ignore", "-z", "--stdin"], {
+      cwd: repoRoot,
+      windowsHide: true
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      reject(error);
+    });
+    child.on("close", (code) => {
+      if (code && code !== 0 && code !== 1) {
+        const message = stderr.trim() || `git check-ignore exited with code ${code}`;
+        reject(new Error(message));
+        return;
+      }
+      resolve({ stdout, exitCode: code });
+    });
+
+    if (child.stdin) {
+      child.stdin.write(input);
+      child.stdin.end();
+    }
+  });
 }
