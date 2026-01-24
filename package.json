@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "publisher": "carlxw.dev",
   "license": "All rights reserved.",
+  "icon": "img/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
