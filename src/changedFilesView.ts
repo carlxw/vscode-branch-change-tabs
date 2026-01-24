@@ -3,7 +3,12 @@ import * as path from "path";
 import { Repository, ChangedFile } from "./types";
 import { getSettings } from "./settings";
 import { resolveBaseRef, getChangedFiles } from "./gitDiff";
-import { filterByChangeKind, filterExcluded, filterExcludedDirectories } from "./filters";
+import {
+  filterByChangeKind,
+  filterExcluded,
+  filterExcludedDirectories,
+  filterGitIgnored
+} from "./filters";
 
 const REFRESH_DEBOUNCE_MS = 200;
 
@@ -66,18 +71,27 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
 
     const selectableFiles = filterByChangeKind(
       changedFiles,
-      settings.includeModified,
-      settings.includeAdded
+      settings.includeModifiedFiles,
+      settings.includeNewlyTrackedFiles
     );
+    if (!filteredFiles.length) {
+      return [createPlaceholderItem("All changes filtered by settings.")];
+    }
+
     const filteredFiles = filterExcluded(
-      filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
+      filterExcludedDirectories(selectableFiles, settings.excludedDirectories),
       settings.excludedFiles
     );
     if (!filteredFiles.length) {
       return [createPlaceholderItem("All changes filtered by settings.")];
     }
 
-    return filteredFiles.map((file) => createChangedFileItem(file, repoRoot));
+    const gitIgnoredFiltered = await filterGitIgnored(repoRoot, filteredFiles);
+    if (!gitIgnoredFiltered.length) {
+      return [createPlaceholderItem("All changes are ignored by .gitignore.")];
+    }
+
+    return gitIgnoredFiltered.map((file) => createChangedFileItem(file, repoRoot));
   }
 }
 

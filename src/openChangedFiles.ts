@@ -9,6 +9,7 @@ import {
   filterByChangeKind,
   filterExcluded,
   filterExcludedDirectories,
+  filterGitIgnored,
   filterTextFiles
 } from "./filters";
 import { closeOpenedFiles, closePinnedOpenedFiles } from "./ui";
@@ -55,7 +56,11 @@ export async function openChangedFilesForRepository(
     return;
   }
 
-  const selectableFiles = filterByChangeKind(changedFiles, settings.includeModified, settings.includeAdded);
+  const selectableFiles = filterByChangeKind(
+    changedFiles,
+    settings.includeModifiedFiles,
+    settings.includeNewlyTrackedFiles
+  );
   if (!selectableFiles.length) {
     output.appendLine("No files matched change-type filters.");
     return;
@@ -64,7 +69,7 @@ export async function openChangedFilesForRepository(
   output.appendLine(`Changed files found: ${selectableFiles.length}`);
 
   const filteredFiles = filterExcluded(
-    filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
+    filterExcludedDirectories(selectableFiles, settings.excludedDirectories),
     settings.excludedFiles
   );
   if (!filteredFiles.length) {
@@ -72,9 +77,16 @@ export async function openChangedFilesForRepository(
     return;
   }
 
-  output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
+  const gitIgnoredFiltered = await filterGitIgnored(repoRoot, filteredFiles);
+  if (!gitIgnoredFiltered.length) {
+    output.appendLine("All changed files were excluded by .gitignore.");
+    return;
+  }
 
-  let filesToConsider = filteredFiles;
+  output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
+  output.appendLine(`Files after .gitignore filter: ${gitIgnoredFiltered.length}`);
+
+  let filesToConsider = gitIgnoredFiltered;
   if (settings.textFilesOnly) {
     filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
     output.appendLine(`Text files after filter: ${filesToConsider.length}`);
@@ -123,7 +135,8 @@ export async function openChangedFilesForRepository(
         preserveFocus: false,
         viewColumn: vscode.ViewColumn.Active
       });
-      const shouldPin = file.kind === "modified" ? settings.pinModified : settings.pinAdded;
+      const shouldPin =
+        file.kind === "modified" ? settings.pinModifiedFiles : settings.pinNewlyTrackedFiles;
       if (shouldPin) {
         await vscode.commands.executeCommand("workbench.action.pinEditor");
       }

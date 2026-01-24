@@ -17,23 +17,26 @@ These settings live under `branchTabs.*`:
   - Branch names that should not trigger auto-opening files.
 - `branchTabs.closeAllBeforeOpen` (boolean, default: `true`)
   - Close all open editors before opening changed files.
-- `branchTabs.includeModified` (boolean, default: `true`)
+- `branchTabs.includeModifiedFiles` (boolean, default: `true`)
   - Open files modified relative to the base branch.
-- `branchTabs.includeAdded` (boolean, default: `true`)
+- `branchTabs.includeNewlyTrackedFiles` (boolean, default: `true`)
   - Open files newly added relative to the base branch.
-- `branchTabs.pinModified` (boolean, default: `true`)
+- `branchTabs.pinModifiedFiles` (boolean, default: `true`)
   - Pin modified files when opening.
-- `branchTabs.pinAdded` (boolean, default: `true`)
+- `branchTabs.pinNewlyTrackedFiles` (boolean, default: `true`)
   - Pin newly added files when opening.
-- `branchTabs.excludedFiles` (array, default: `[]`)
+- `branchTabs.excludedFiles` (array, default: common image/binary patterns and git meta files)
   - Regex strings to exclude files from opening (matched against repo-relative paths).
   - Supports either `pattern` or `/pattern/flags` formats.
+  - Files ignored by `.gitignore` are already excluded.
+  - Common patterns: `\\.png$`, `\\.jpe?g$`, `\\.svg$`, `\\.gif$`, `\\.pdf$`, `\\.zip$`, `\\.gz$`, `\\.7z$`, `\\.exe$`, `\\.dmg$`, `^\\.gitignore$`
 - `branchTabs.maxFilesToOpen` (number, default: `10`)
   - Opens up to this many text files when more are changed.
 - `branchTabs.textFilesOnly` (boolean, default: `true`)
   - Only open text files and skip binaries.
-- `branchTabs.excludeDirRegexes` (array, default: `[]`)
+- `branchTabs.excludedDirectories` (array, default: `[]`)
   - Regex strings to exclude directories (matched against repo-relative paths).
+  - Recommended: `^dist/`, `^build/`, `^out/`, `^coverage/`, `^node_modules/`, `^\\.turbo/`, `^\\.next/`
 - `branchTabs.closePinnedTabsOnBranchChange` (boolean, default: `false`)
   - Closes pinned tabs that were opened by this extension when switching branches.
 - `branchTabs.closeAllOnExcludedBranch` (boolean, default: `true`)

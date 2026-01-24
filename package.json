@@ -50,10 +50,7 @@
       "properties": {
         "branchTabs.excludedBranches": {
           "type": "array",
-          "default": [
-            "main",
-            "master"
-          ],
+          "default": [],
           "description": "Checking out to these branches will not trigger this extension.",
           "items": {
             "type": "string"
@@ -64,30 +61,46 @@
           "default": true,
           "description": "Close all open editors before opening changed files."
         },
-        "branchTabs.includeModified": {
+        "branchTabs.includeModifiedFiles": {
           "type": "boolean",
           "default": true,
           "description": "Open files that are modified relative to the main branch."
         },
-        "branchTabs.includeAdded": {
+        "branchTabs.includeNewlyTrackedFiles": {
           "type": "boolean",
           "default": true,
           "description": "Open files that are newly tracked relative to the main branch."
         },
-        "branchTabs.pinModified": {
+        "branchTabs.pinModifiedFiles": {
           "type": "boolean",
           "default": true,
           "description": "Pin modified files when opening. Otherwise, just open the files."
         },
-        "branchTabs.pinAdded": {
+        "branchTabs.pinNewlyTrackedFiles": {
           "type": "boolean",
           "default": true,
           "description": "Pin newly added files when opening. Otherwise, just open the files."
         },
         "branchTabs.excludedFiles": {
           "type": "array",
-          "default": [],
-          "description": "List of regex strings (i.e., file name, file extension) to be ignored by this extension.",
+          "default": [
+            "\\.png$",
+            "\\.jpe?g$",
+            "\\.svg$",
+            "\\.gif$",
+            "\\.pdf$",
+            "\\.zip$",
+            "\\.tar$",
+            "\\.gz$",
+            "\\.7z$",
+            "\\.exe$",
+            "\\.dmg$",
+            "\\.iso$",
+            "\\.jar$",
+            "^\\.gitignore$",
+            "^\\.gitattributes$"
+          ],
+          "description": "List of regex strings (i.e., file name, file extension) to be ignored by this extension. Files ignored by .gitignore are already excluded.",
           "items": {
             "type": "string"
           }
@@ -102,9 +115,17 @@
           "default": true,
           "description": "Only open text files (skip binary/image files)."
         },
-        "branchTabs.excludeDirRegexes": {
+        "branchTabs.excludedDirectories": {
           "type": "array",
-          "default": [],
+          "default": [
+            "^dist/",
+            "^build/",
+            "^out/",
+            "^coverage/",
+            "^node_modules/",
+            "^\\.turbo/",
+            "^\\.next/"
+          ],
           "description": "List of regex strings (directory URIs) to be ignored by this extension.",
           "items": {
             "type": "string"
@@ -135,8 +156,8 @@
         },
         "branchTabs.baseBranch": {
           "type": "string",
-          "default": "",
-          "description": "Optional base branch/ref to diff against. If empty, uses upstream if set, otherwise main/master will be used."
+          "default": "main",
+          "description": "Optional base branch/ref to diff against."
         }
       }
     }

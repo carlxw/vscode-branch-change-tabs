@@ -10,21 +10,62 @@ export function getSettings(): Settings {
     config.get<boolean>("promptOnNewRepository") ?? config.get<boolean>("promptOnNewRepo");
   const enabledRepositories =
     config.get<string[]>("enabledRepositories") ?? config.get<string[]>("enabledRepos");
+  const baseBranch = config.get<string>("baseBranch", "");
+  const excludedBranches = config.get<string[]>("excludedBranches", ["main", "master"]);
+  const includeModifiedFiles =
+    config.get<boolean>("includeModifiedFiles") ?? config.get<boolean>("includeModified");
+  const includeNewlyTrackedFiles =
+    config.get<boolean>("includeNewlyTrackedFiles") ?? config.get<boolean>("includeAdded");
+  const pinModifiedFiles =
+    config.get<boolean>("pinModifiedFiles") ?? config.get<boolean>("pinModified");
+  const pinNewlyTrackedFiles =
+    config.get<boolean>("pinNewlyTrackedFiles") ?? config.get<boolean>("pinAdded");
+  const excludedDirectories =
+    config.get<string[]>("excludedDirectories") ??
+    config.get<string[]>("excludeDirRegexes") ?? [
+      "^dist/",
+      "^build/",
+      "^out/",
+      "^coverage/",
+      "^node_modules/",
+      "^\\.turbo/",
+      "^\\.next/"
+    ];
+  const normalizedBase = baseBranch.trim();
+  if (normalizedBase.length > 0 && !excludedBranches.includes(normalizedBase)) {
+    excludedBranches.push(normalizedBase);
+  }
   return {
-    excludedBranches: config.get<string[]>("excludedBranches", ["main", "master"]),
+    excludedBranches,
     closeAllBeforeOpen: config.get<boolean>("closeAllBeforeOpen", true),
-    includeModified: config.get<boolean>("includeModified", true),
-    includeAdded: config.get<boolean>("includeAdded", true),
-    pinModified: config.get<boolean>("pinModified", true),
-    pinAdded: config.get<boolean>("pinAdded", true),
-    excludedFiles: config.get<string[]>("excludedFiles", []),
+    includeModifiedFiles: includeModifiedFiles ?? true,
+    includeNewlyTrackedFiles: includeNewlyTrackedFiles ?? true,
+    pinModifiedFiles: pinModifiedFiles ?? true,
+    pinNewlyTrackedFiles: pinNewlyTrackedFiles ?? true,
+    excludedFiles: config.get<string[]>("excludedFiles", [
+      "\\.png$",
+      "\\.jpe?g$",
+      "\\.svg$",
+      "\\.gif$",
+      "\\.pdf$",
+      "\\.zip$",
+      "\\.tar$",
+      "\\.gz$",
+      "\\.7z$",
+      "\\.exe$",
+      "\\.dmg$",
+      "\\.iso$",
+      "\\.jar$",
+      "^\\.gitignore$",
+      "^\\.gitattributes$"
+    ]),
     maxFilesToOpen: config.get<number>("maxFilesToOpen", 10),
     textFilesOnly: config.get<boolean>("textFilesOnly", true),
-    excludeDirRegexes: config.get<string[]>("excludeDirRegexes", []),
+    excludedDirectories: excludedDirectories ?? [],
     closePinnedTabsOnBranchChange: config.get<boolean>("closePinnedTabsOnBranchChange", false),
     closeAllOnExcludedBranch: config.get<boolean>("closeAllOnExcludedBranch", true),
     promptOnNewRepository: promptOnNewRepository ?? true,
     enabledRepositories: enabledRepositories ?? [],
-    baseBranch: config.get<string>("baseBranch", "")
+    baseBranch
   };
 }

@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { ChangedFile } from "./types";
 import { output } from "./logger";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Filters files by change kind based on user settings.
@@ -67,6 +71,50 @@ export async function filterTextFiles(
     }
   }
   return result;
+}
+
+/**
+ * Filters files ignored by git (honors .gitignore and related excludes).
+ */
+export async function filterGitIgnored(
+  repoRoot: string,
+  files: ChangedFile[]
+): Promise<ChangedFile[]> {
+  if (files.length === 0) {
+    return files;
+  }
+
+  const input = files.map((file) => file.path).join("\0") + "\0";
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["check-ignore", "-z", "--stdin"],
+      { cwd: repoRoot, windowsHide: true, input }
+    );
+    if (!stdout) {
+      return files;
+    }
+    const ignored = new Set(
+      stdout
+        .split("\0")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    );
+    if (ignored.size === 0) {
+      return files;
+    }
+    return files.filter((file) => !ignored.has(file.path));
+  } catch (error) {
+    const exitCode =
+      typeof (error as { code?: number }).code === "number"
+        ? (error as { code: number }).code
+        : undefined;
+    if (exitCode === 1) {
+      return files;
+    }
+    output.appendLine(`Failed to apply gitignore filters: ${stringifyError(error)}`);
+    return files;
+  }
 }
 
 /**

@@ -40,14 +40,14 @@ export type RepositoryTrackingState = {
 export type Settings = {
   excludedBranches: string[];
   closeAllBeforeOpen: boolean;
-  includeModified: boolean;
-  includeAdded: boolean;
-  pinModified: boolean;
-  pinAdded: boolean;
+  includeModifiedFiles: boolean;
+  includeNewlyTrackedFiles: boolean;
+  pinModifiedFiles: boolean;
+  pinNewlyTrackedFiles: boolean;
   excludedFiles: string[];
   maxFilesToOpen: number;
   textFilesOnly: boolean;
-  excludeDirRegexes: string[];
+  excludedDirectories: string[];
   closePinnedTabsOnBranchChange: boolean;
   closeAllOnExcludedBranch: boolean;
   promptOnNewRepository: boolean;
