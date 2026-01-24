@@ -62,12 +62,27 @@ export async function ensureRepoEnabledOnFirstCheckout(
 
   const choice = await vscode.window.showInformationMessage(
     "Enable Branch Change Tabs for this repository?",
-    { modal: true, detail: key },
+    { detail: key },
     "Enable",
-    "Disable"
+    "Always Enable",
+    "Disable",
+    "Don't Ask Again"
   );
 
-  const enabled = choice === "Enable";
+  if (!choice) {
+    return true;
+  }
+
+  if (choice === "Don't Ask Again") {
+    const config = vscode.workspace.getConfiguration("branchTabs");
+    await config.update("promptOnNewRepo", false, true);
+    repoEnabledCache.set(key, true);
+    await extensionContext.globalState.update(`repoEnabled:${key}`, true);
+    output.appendLine("Disabled future repo prompts (branchTabs.promptOnNewRepo = false).");
+    return true;
+  }
+
+  const enabled = choice === "Enable" || choice === "Always Enable";
   repoEnabledCache.set(key, enabled);
   await extensionContext.globalState.update(`repoEnabled:${key}`, enabled);
   if (!enabled) {
