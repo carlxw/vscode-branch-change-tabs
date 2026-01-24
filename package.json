@@ -18,7 +18,7 @@
   "extensionDependencies": [
     "vscode.git"
   ],
-  "main": "./out/main.js",
+  "main": "./build/main.js",
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -watch -p .",
