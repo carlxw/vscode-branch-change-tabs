@@ -5,7 +5,7 @@
     "lib": [
       "ES2020"
     ],
-    "outDir": "out",
+    "outDir": "build",
     "rootDir": "src",
     "sourceMap": true,
     "strict": true,
