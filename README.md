@@ -46,6 +46,12 @@ These settings live under `branchTabs.*`:
   - Prompt to enable or disable the extension when a new repository is opened.
 - `branchTabs.enabledRepos` (array, default: `[]`)
   - List of repository root paths where the extension is enabled. If non-empty, only these repos are enabled.
+
+## Commands
+- `Branch Change Tabs: Open Changed Files`
+  - Opens the current branch's changed files for the active repository using your configured settings.
+- `Branch Change Tabs: Close Pinned Tabs in Active Group`
+  - Closes pinned tabs in the currently active editor group.
 - `branchTabs.baseBranch` (string, default: `""`)
   - Optional base branch/ref to diff against. If empty, uses upstream if set; otherwise
   `main`/`master` when available.

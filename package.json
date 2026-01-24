@@ -20,6 +20,16 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "branchTabs.openChangedFiles",
+        "title": "Branch Change Tabs: Open Changed Files"
+      },
+      {
+        "command": "branchTabs.closePinnedTabsInGroup",
+        "title": "Branch Change Tabs: Close Pinned Tabs in Active Group"
+      }
+    ],
     "configuration": {
       "title": "Branch Change Tabs",
       "properties": {

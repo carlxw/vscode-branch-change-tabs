@@ -47,6 +47,8 @@ const output = vscode.window.createOutputChannel("Branch Change Tabs");
 const repoEnabledCache = new Map<string, boolean>();
 let extensionContext: vscode.ExtensionContext | undefined;
 const DEV_CLEAR_COMMAND = "branchTabs.dev.clearRepoDecisions";
+const OPEN_CHANGED_COMMAND = "branchTabs.openChangedFiles";
+const CLOSE_PINNED_GROUP_COMMAND = "branchTabs.closePinnedTabsInGroup";
 
 /**
  * Entry point for the extension; wires up git repository listeners.
@@ -77,6 +79,24 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(clearCommand);
   }
+
+  const openChangedCommand = vscode.commands.registerCommand(OPEN_CHANGED_COMMAND, async () => {
+    const repo = getActiveRepository();
+    if (!repo) {
+      void vscode.window.showInformationMessage("Branch Change Tabs: no active repository found.");
+      return;
+    }
+    await openChangedFilesForRepo(repo, { ignoreEnablement: true });
+  });
+  context.subscriptions.push(openChangedCommand);
+
+  const closePinnedGroupCommand = vscode.commands.registerCommand(
+    CLOSE_PINNED_GROUP_COMMAND,
+    async () => {
+      await closePinnedTabsInActiveGroup();
+    }
+  );
+  context.subscriptions.push(closePinnedGroupCommand);
 }
 
 /**
@@ -140,116 +160,7 @@ async function handleRepositoryChange(repo: Repository) {
   }
 
   output.appendLine(`Branch changed: ${previousBranch ?? "(unknown)"} -> ${currentBranch}`);
-
-  const repoRoot = repo.rootUri.fsPath;
-  const baseRef = await resolveBaseRef(
-    repoRoot,
-    settings.baseBranch,
-    repo.state.HEAD?.name,
-    repo.state.HEAD?.upstream?.name
-  );
-  if (!baseRef) {
-    output.appendLine("No base ref found. Skipping diff.");
-    return;
-  }
-
-  output.appendLine(`Using base ref: ${baseRef}`);
-
-  const changedFiles = await getChangedFiles(repoRoot, baseRef, currentBranch);
-  if (!changedFiles.length) {
-    output.appendLine("No changed files found for branch diff.");
-    return;
-  }
-
-  const selectableFiles = filterByChangeKind(changedFiles, settings.includeModified, settings.includeAdded);
-  if (!selectableFiles.length) {
-    output.appendLine("No files matched change-type filters.");
-    return;
-  }
-
-  output.appendLine(`Changed files found: ${selectableFiles.length}`);
-
-  const filteredFiles = filterExcluded(
-    filterExcludedExtensions(
-      filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
-      settings.excludeExtensions
-    ),
-    settings.excludeRegexes
-  );
-  if (!filteredFiles.length) {
-    output.appendLine("All changed files were excluded by regex.");
-    return;
-  }
-
-  output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
-
-  let filesToConsider = filteredFiles;
-  if (settings.textFilesOnly) {
-    filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
-    output.appendLine(`Text files after filter: ${filesToConsider.length}`);
-    if (filesToConsider.length === 0) {
-      output.appendLine("No text files found for branch diff.");
-      return;
-    }
-  }
-
-  const maxToOpen = settings.maxFilesToOpen > 0 ? settings.maxFilesToOpen : Infinity;
-  if (settings.maxFilesToOpen > 0 && filesToConsider.length > settings.maxFilesToOpen) {
-    output.appendLine(
-      `Limit exceeded: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
-    );
-    const shouldOpen = await promptOpenWhenLimitExceeded(
-      filesToConsider.length,
-      settings.maxFilesToOpen
-    );
-    if (!shouldOpen) {
-      return;
-    }
-    await maybeUpdateMaxFilesLimit(settings.maxFilesToOpen);
-  }
-
-  // Always clear previously opened tabs from the extension when switching branches.
-  await closeOpenedFiles(state);
-
-  if (settings.closePinnedTabsOnBranchChange) {
-    await vscode.commands.executeCommand("workbench.action.closeAllPinnedEditors");
-  }
-
-  if (settings.closeAllBeforeOpen) {
-    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-  }
-
-  let openedCount = 0;
-  for (const file of filesToConsider) {
-      if (openedCount >= maxToOpen) {
-        break;
-      }
-      const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
-      if (!(await fileExists(fileUri))) {
-        continue;
-      }
-      try {
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(doc, {
-          preview: false,
-          preserveFocus: false,
-          viewColumn: vscode.ViewColumn.Active
-        });
-        const shouldPin =
-          file.kind === "modified" ? settings.pinModified : settings.pinAdded;
-        if (shouldPin) {
-          await vscode.commands.executeCommand("workbench.action.pinEditor");
-        }
-        state.openedFiles.add(fileUri.toString());
-        openedCount += 1;
-      } catch (error) {
-        output.appendLine(`Skipping non-text file "${file.path}": ${stringifyError(error)}`);
-      }
-  }
-
-  if (openedCount === 0) {
-    output.appendLine("No text files were opened.");
-  }
+  await openChangedFilesForRepo(repo, { ignoreEnablement: false });
 }
 
 /**
@@ -599,6 +510,166 @@ async function clearRepoDecisions(context: vscode.ExtensionContext): Promise<voi
   for (const key of keys) {
     await context.globalState.update(key, undefined);
   }
+}
+
+function getActiveRepository(): Repository | undefined {
+  const active = vscode.window.activeTextEditor?.document.uri;
+  const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git")?.exports;
+  if (!gitExtension) {
+    return undefined;
+  }
+  const git = gitExtension.getAPI(1);
+  if (active) {
+    const match = git.repositories.find((repo) =>
+      active.fsPath.toLowerCase().startsWith(repo.rootUri.fsPath.toLowerCase())
+    );
+    if (match) {
+      return match;
+    }
+  }
+  return git.repositories[0];
+}
+
+async function openChangedFilesForRepo(
+  repo: Repository,
+  options: { ignoreEnablement: boolean }
+): Promise<void> {
+  const settings = getSettings();
+  if (settings.excludedBranches.includes(repo.state.HEAD?.name ?? "")) {
+    output.appendLine(`Branch "${repo.state.HEAD?.name}" excluded.`);
+    return;
+  }
+  if (!options.ignoreEnablement) {
+    const enabled = await ensureRepoEnabledOnFirstCheckout(repo, settings);
+    if (!enabled) {
+      output.appendLine(`Repository disabled by user: ${repo.rootUri.fsPath}`);
+      return;
+    }
+  }
+
+  const repoRoot = repo.rootUri.fsPath;
+  const headName = repo.state.HEAD?.name;
+  const baseRef = await resolveBaseRef(
+    repoRoot,
+    settings.baseBranch,
+    headName,
+    repo.state.HEAD?.upstream?.name
+  );
+  if (!baseRef || !headName) {
+    output.appendLine("No base ref found. Skipping diff.");
+    return;
+  }
+
+  output.appendLine(`Using base ref: ${baseRef}`);
+
+  const changedFiles = await getChangedFiles(repoRoot, baseRef, headName);
+  if (!changedFiles.length) {
+    output.appendLine("No changed files found for branch diff.");
+    return;
+  }
+
+  const selectableFiles = filterByChangeKind(changedFiles, settings.includeModified, settings.includeAdded);
+  if (!selectableFiles.length) {
+    output.appendLine("No files matched change-type filters.");
+    return;
+  }
+
+  output.appendLine(`Changed files found: ${selectableFiles.length}`);
+
+  const filteredFiles = filterExcluded(
+    filterExcludedExtensions(
+      filterExcludedDirectories(selectableFiles, settings.excludeDirRegexes),
+      settings.excludeExtensions
+    ),
+    settings.excludeRegexes
+  );
+  if (!filteredFiles.length) {
+    output.appendLine("All changed files were excluded by regex.");
+    return;
+  }
+
+  output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
+
+  let filesToConsider = filteredFiles;
+  if (settings.textFilesOnly) {
+    filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
+    output.appendLine(`Text files after filter: ${filesToConsider.length}`);
+    if (filesToConsider.length === 0) {
+      output.appendLine("No text files found for branch diff.");
+      return;
+    }
+  }
+
+  const maxToOpen = settings.maxFilesToOpen > 0 ? settings.maxFilesToOpen : Infinity;
+  if (settings.maxFilesToOpen > 0 && filesToConsider.length > settings.maxFilesToOpen) {
+    output.appendLine(
+      `Limit exceeded: ${filesToConsider.length} files exceeds maxFilesToOpen=${settings.maxFilesToOpen}`
+    );
+    const shouldOpen = await promptOpenWhenLimitExceeded(
+      filesToConsider.length,
+      settings.maxFilesToOpen
+    );
+    if (!shouldOpen) {
+      return;
+    }
+    await maybeUpdateMaxFilesLimit(settings.maxFilesToOpen);
+  }
+
+  const state = repoStates.get(repoRoot);
+  if (state) {
+    await closeOpenedFiles(state);
+  }
+
+  if (settings.closePinnedTabsOnBranchChange) {
+    await vscode.commands.executeCommand("workbench.action.closeAllPinnedEditors");
+  }
+
+  if (settings.closeAllBeforeOpen) {
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+  }
+
+  let openedCount = 0;
+  for (const file of filesToConsider) {
+    if (openedCount >= maxToOpen) {
+      break;
+    }
+    const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
+    if (!(await fileExists(fileUri))) {
+      continue;
+    }
+    try {
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc, {
+        preview: false,
+        preserveFocus: false,
+        viewColumn: vscode.ViewColumn.Active
+      });
+      const shouldPin = file.kind === "modified" ? settings.pinModified : settings.pinAdded;
+      if (shouldPin) {
+        await vscode.commands.executeCommand("workbench.action.pinEditor");
+      }
+      if (state) {
+        state.openedFiles.add(fileUri.toString());
+      }
+      openedCount += 1;
+    } catch (error) {
+      output.appendLine(`Skipping non-text file "${file.path}": ${stringifyError(error)}`);
+    }
+  }
+
+  if (openedCount === 0) {
+    output.appendLine("No text files were opened.");
+  }
+}
+
+async function closePinnedTabsInActiveGroup(): Promise<void> {
+  const group = vscode.window.tabGroups.activeTabGroup;
+  const toClose = group.tabs.filter((tab) => tab.isPinned);
+  if (toClose.length === 0) {
+    void vscode.window.showInformationMessage("Branch Change Tabs: no pinned tabs in active group.");
+    return;
+  }
+  await vscode.window.tabGroups.close(toClose, true);
 }
 
 async function ensureRepoEnabledOnFirstCheckout(
