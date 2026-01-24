@@ -31,7 +31,7 @@
       "explorer": [
         {
           "id": "branchTabs.changedFiles",
-          "name": "Branch Change Files"
+          "name": "Branch Modified/Tracked Files"
         }
       ]
     },
