@@ -1,10 +1,11 @@
 {
   "name": "branch-change-tabs",
   "displayName": "Branch Change Tabs",
-  "description": "Opens modified files when switching git branches (excluding configured branches).",
-  "version": "0.0.1",
-  "publisher": "your-name",
-  "license": "UNLICENSED",
+  "description": "Opens modified/newly-tracked files upon switching git branches.",
+  "version": "1.0.0",
+  "publisher": "carlxw.dev",
+  "license": "All rights reserved.",
+  "icon": "img/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -18,8 +19,23 @@
   "extensionDependencies": [
     "vscode.git"
   ],
-  "main": "./out/extension.js",
+  "main": "./build/main.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "lint": "echo \"No lint configured\"",
+    "package": "vsce package"
+  },
+
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "branchTabs.changedFiles",
+          "name": "Branch Modified/Tracked Files"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "branchTabs.openChangedFiles",
@@ -27,7 +43,7 @@
       },
       {
         "command": "branchTabs.closePinnedTabsInGroup",
-        "title": "Branch Change Tabs: Close Pinned Tabs in Active Group"
+        "title": "Branch Change Tabs: Close Pinned Tabs in Currently Active Group"
       }
     ],
     "configuration": {
@@ -35,11 +51,8 @@
       "properties": {
         "branchTabs.excludedBranches": {
           "type": "array",
-          "default": [
-            "main",
-            "master"
-          ],
-          "description": "Branch names that should not trigger auto-opening files.",
+          "default": [],
+          "description": "Checking out to these branches will not trigger this extension.",
           "items": {
             "type": "string"
           }
@@ -49,35 +62,46 @@
           "default": true,
           "description": "Close all open editors before opening changed files."
         },
-        "branchTabs.pinOpenedTabs": {
+        "branchTabs.includeModifiedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Pin editors opened by the extension (preview=false)."
+          "description": "Open files that are modified relative to the main branch."
         },
-        "branchTabs.includeModified": {
+        "branchTabs.includeNewlyTrackedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Open files that are modified relative to the base branch."
+          "description": "Open files that are newly tracked relative to the main branch."
         },
-        "branchTabs.includeAdded": {
+        "branchTabs.pinModifiedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Open files that are newly added relative to the base branch."
+          "description": "Pin modified files when opening. Otherwise, just open the files."
         },
-        "branchTabs.pinModified": {
+        "branchTabs.pinNewlyTrackedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Pin modified files when opening."
+          "description": "Pin newly added files when opening. Otherwise, just open the files."
         },
-        "branchTabs.pinAdded": {
-          "type": "boolean",
-          "default": true,
-          "description": "Pin newly added files when opening."
-        },
-        "branchTabs.excludeRegexes": {
+        "branchTabs.excludedFiles": {
           "type": "array",
-          "default": [],
-          "description": "List of regex strings to exclude file paths from opening.",
+          "default": [
+            "\\.png$",
+            "\\.jpe?g$",
+            "\\.svg$",
+            "\\.gif$",
+            "\\.pdf$",
+            "\\.zip$",
+            "\\.tar$",
+            "\\.gz$",
+            "\\.7z$",
+            "\\.exe$",
+            "\\.dmg$",
+            "\\.iso$",
+            "\\.jar$",
+            "^\\.gitignore$",
+            "^\\.gitattributes$"
+          ],
+          "description": "List of regex strings (i.e., file name, file extension) to be ignored by this extension. Files ignored by .gitignore are already excluded.",
           "items": {
             "type": "string"
           }
@@ -85,25 +109,25 @@
         "branchTabs.maxFilesToOpen": {
           "type": "number",
           "default": 10,
-          "description": "Open up to this many text files when more are changed."
+          "description": "This extension will open this many files upon a branch change."
         },
         "branchTabs.textFilesOnly": {
           "type": "boolean",
           "default": true,
-          "description": "Only open text files (skip binary files)."
+          "description": "Only open text files (skip binary/image files)."
         },
-        "branchTabs.excludeExtensions": {
+        "branchTabs.excludedDirectories": {
           "type": "array",
-          "default": [],
-          "description": "List of file extensions to skip when opening files (e.g., .pdf, .png).",
-          "items": {
-            "type": "string"
-          }
-        },
-        "branchTabs.excludeDirRegexes": {
-          "type": "array",
-          "default": [],
-          "description": "List of regex strings to exclude directories (matched against repo-relative paths).",
+          "default": [
+            "^dist/",
+            "^build/",
+            "^out/",
+            "^coverage/",
+            "^node_modules/",
+            "^\\.turbo/",
+            "^\\.next/"
+          ],
+          "description": "List of regex strings (directory URIs) to be ignored by this extension.",
           "items": {
             "type": "string"
           }
@@ -111,40 +135,35 @@
         "branchTabs.closePinnedTabsOnBranchChange": {
           "type": "boolean",
           "default": false,
-          "description": "Close all pinned tabs when switching branches."
+          "description": "Close pinned tabs that were opened by this extension when switching branches."
         },
         "branchTabs.closeAllOnExcludedBranch": {
           "type": "boolean",
           "default": true,
-          "description": "Close tabs that were opened by the extension when switching to an excluded branch."
+          "description": "Close tabs that were opened by the extension when switching to an ignored branch."
         },
-        "branchTabs.promptOnNewRepo": {
+        "branchTabs.promptOnNewRepository": {
           "type": "boolean",
           "default": true,
           "description": "Prompt to enable or disable the extension when a new repository is opened."
         },
-        "branchTabs.enabledRepos": {
+        "branchTabs.disabledRepositories": {
           "type": "array",
           "default": [],
-          "description": "List of repository root paths where the extension is enabled. If non-empty, only these repos are enabled.",
+          "description": "List of repository root paths where the extension is disabled.",
           "items": {
             "type": "string"
           }
         },
         "branchTabs.baseBranch": {
           "type": "string",
-          "default": "",
-          "description": "Optional base branch/ref to diff against. If empty, uses upstream if set, otherwise main/master when available."
+          "default": "main",
+          "description": "Optional base branch/ref to diff against."
         }
       }
     }
   },
-  "scripts": {
-    "build": "tsc -p .",
-    "watch": "tsc -watch -p .",
-    "lint": "echo \"No lint configured\"",
-    "package": "vsce package"
-  },
+
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/vscode": "^1.85.0",
