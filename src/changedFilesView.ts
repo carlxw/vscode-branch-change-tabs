@@ -16,6 +16,9 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   private refreshTimer?: NodeJS.Timeout;
+  private loading = false;
+  private inflight?: Promise<void>;
+  private cachedItems: vscode.TreeItem[] | null = null;
 
   constructor(private readonly getRepository: () => Repository | undefined) {}
 
@@ -29,6 +32,7 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
     // Debounce to avoid hammering git on rapid status changes.
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
+      void this.loadData();
       this.onDidChangeTreeDataEmitter.fire();
     }, REFRESH_DEBOUNCE_MS);
   }
@@ -48,18 +52,58 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return [];
     }
 
+    if (this.loading && !this.cachedItems) {
+      return [createPlaceholderItem("Loading changed files...")];
+    }
+    if (this.cachedItems) {
+      return this.cachedItems;
+    }
+
+    await this.loadData();
+    return this.cachedItems ?? [createPlaceholderItem("Loading changed files...")];
+  }
+
+  private async loadData(): Promise<void> {
+    if (this.inflight) {
+      return this.inflight;
+    }
+    this.loading = true;
+    this.cachedItems = null;
+    const task = this.loadDataInternal()
+      .catch((error) => {
+        this.cachedItems = [createPlaceholderItem(`Failed to load changes: ${String(error)}`)];
+      })
+      .finally(() => {
+        this.loading = false;
+        this.inflight = undefined;
+        this.onDidChangeTreeDataEmitter.fire();
+      });
+    this.inflight = task;
+    return task;
+  }
+
+  private async loadDataInternal(): Promise<void> {
     const repo = this.getRepository();
     if (!repo) {
-      return [createPlaceholderItem("No git repository detected.")];
+      this.cachedItems = [createPlaceholderItem("No git repository detected.")];
+      return;
     }
 
     const settings = getExtensionSettings();
     const branchName = repo.state.HEAD?.name;
     if (!branchName) {
-      return [createPlaceholderItem("No active branch detected.")];
-    }
-    if (settings.excludedBranches.includes(branchName)) {
-      return [createPlaceholderItem(`Branch "${branchName}" excluded by settings.`)];
+      this.cachedItems = [createPlaceholderItem("No active branch detected.")];
+      return;
+    } else if (settings.baseBranch === branchName) {
+      this.cachedItems = [
+        createPlaceholderItem(
+          `Currently on "${branchName}", which is the base branch. Checkout to another branch to see items here.`
+        )
+      ];
+      return;
+    } else if (settings.excludedBranches.includes(branchName)) {
+      this.cachedItems = [createPlaceholderItem(`Branch "${branchName}" excluded by settings.`)];
+      return;
     }
 
     const repoRoot = repo.rootUri.fsPath;
@@ -70,12 +114,14 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       repo.state.HEAD?.upstream?.name
     );
     if (!baseRef) {
-      return [createPlaceholderItem("No base ref found for diff.")];
+      this.cachedItems = [createPlaceholderItem("No base ref found for diff.")];
+      return;
     }
 
     const changedFiles = await getChangedFiles(repoRoot, baseRef, branchName);
     if (!changedFiles.length) {
-      return [createPlaceholderItem("No changes detected vs base branch.")];
+      this.cachedItems = [createPlaceholderItem("No changes detected vs base branch.")];
+      return;
     }
 
     const selectableFiles = filterByTypeOfChange(
@@ -88,15 +134,17 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       settings.excludedFiles
     );
     if (!filteredFiles.length) {
-      return [createPlaceholderItem("All changes filtered by settings.")];
+      this.cachedItems = [createPlaceholderItem("All changes filtered by settings.")];
+      return;
     }
 
     const gitIgnoredFiltered = await filterGitIgnoredFilesDirectories(repoRoot, filteredFiles);
     if (!gitIgnoredFiltered.length) {
-      return [createPlaceholderItem("All changes are ignored by .gitignore.")];
+      this.cachedItems = [createPlaceholderItem("All changes are ignored by .gitignore.")];
+      return;
     }
 
-    return gitIgnoredFiltered.map((file) => createChangedFileItem(file, repoRoot));
+    this.cachedItems = gitIgnoredFiltered.map((file) => createChangedFileItem(file, repoRoot));
   }
 }
 
@@ -106,6 +154,7 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
 function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.TreeItem {
   const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
   const item = new vscode.TreeItem(file.path, vscode.TreeItemCollapsibleState.None);
+
   item.resourceUri = fileUri;
   item.description = file.kind;
   item.iconPath = new vscode.ThemeIcon(file.kind === "added" ? "diff-added" : "diff-modified");
@@ -114,6 +163,7 @@ function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.Tree
     title: "Open File",
     arguments: [fileUri]
   };
+
   return item;
 }
 
