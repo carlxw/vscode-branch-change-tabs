@@ -28,7 +28,7 @@
     "build": "tsc -p .",
     "watch": "tsc -watch -p .",
     "lint": "echo \"No lint configured\"",
-    "package": "vsce package"
+    "package": "npx @vscode/vsce package"
   },
 
   "contributes": {
