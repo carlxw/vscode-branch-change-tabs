@@ -107,7 +107,11 @@ function parseNameStatus(line: string): ChangedFile | undefined {
  * Executes a git command in the repository root.
  */
 async function execGit(repoRoot: string, args: string[]) {
-  return execFileAsync("git", args, { cwd: repoRoot, windowsHide: true });
+  return execFileAsync("git", args, {
+    cwd: repoRoot,
+    windowsHide: true,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }
+  });
 }
 
 /**

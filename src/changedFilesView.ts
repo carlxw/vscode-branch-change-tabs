@@ -19,6 +19,8 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
   private loading = false;
   private inflight?: Promise<void>;
   private cachedItems: vscode.TreeItem[] | null = null;
+  private viewVisible = true;
+  private pendingRefresh = false;
 
   constructor(private readonly getRepository: () => Repository | undefined) {}
 
@@ -26,15 +28,34 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
    * Signals the view to refresh, debounced to avoid rapid git calls.
    */
   refresh(): void {
+    if (!this.viewVisible) {
+      this.pendingRefresh = true;
+      return;
+    }
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
     }
+
     // Debounce to avoid hammering git on rapid status changes.
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
       void this.loadData();
-      this.onDidChangeTreeDataEmitter.fire();
     }, REFRESH_DEBOUNCE_MS);
+  }
+
+  /**
+   * Updates whether the view is currently visible to the user.
+   */
+  setVisible(visible: boolean): void {
+    this.viewVisible = visible;
+    if (!visible && this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+    if (visible && this.pendingRefresh) {
+      this.pendingRefresh = false;
+      this.refresh();
+    }
   }
 
   /**
@@ -68,10 +89,11 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return this.inflight;
     }
     this.loading = true;
-    this.cachedItems = null;
     const task = this.loadDataInternal()
       .catch((error) => {
-        this.cachedItems = [createPlaceholderItem(`Failed to load changes: ${String(error)}`)];
+        if (!this.cachedItems) {
+          this.cachedItems = [createPlaceholderItem(`Failed to load changes: ${String(error)}`)];
+        }
       })
       .finally(() => {
         this.loading = false;

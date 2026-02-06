@@ -27,6 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
   const changedFilesTree = vscode.window.createTreeView("branchTabs.changedFiles", {
     treeDataProvider: changedFilesView
   });
+  changedFilesView.setVisible(changedFilesTree.visible);
+  context.subscriptions.push(
+    changedFilesTree.onDidChangeVisibility((event) => {
+      changedFilesView.setVisible(event.visible);
+    })
+  );
   context.subscriptions.push(changedFilesTree);
 
   for (const repo of git.repositories) {
