@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { ChangedFile } from "./types";
-import { output } from "./logger";
+import { ChangedFile } from "../core/types";
+import { output } from "../core/logger";
 
 const execFileAsync = promisify(execFile);
 

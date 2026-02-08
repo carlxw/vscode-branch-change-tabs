@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { GitRepositoryState, Repository } from "./types";
+import { GitRepositoryState, Repository } from "../core/types";
 
 /**
  * Closes tabs that were opened by the extension.

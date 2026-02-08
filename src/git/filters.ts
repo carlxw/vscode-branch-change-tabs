@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { spawn } from "child_process";
-import { ChangedFile } from "./types";
-import { output } from "./logger";
+import { ChangedFile } from "../core/types";
+import { output } from "../core/logger";
 
 /**
  * Filters files by change kind based on user settings.

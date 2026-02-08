@@ -1,20 +1,20 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { Repository } from "./types";
-import { output } from "./logger";
-import { getExtensionSettings } from "./settings";
-import { isRepositoryEnabledOnInitialCheckout } from "./repoEnablement";
-import { resolveBaseRef, getChangedFiles } from "./gitDiff";
+import { Repository } from "../../core/types";
+import { output } from "../../core/logger";
+import { getExtensionSettings } from "../../core/settings";
+import { isRepositoryEnabledOnInitialCheckout } from "../../state/repoEnablement";
+import { resolveBaseRef, getChangedFiles } from "../../git/gitDiff";
 import {
   filterByTypeOfChange,
   filterExcludedFiles,
   filterExcludedDirectories,
   filterGitIgnoredFilesDirectories,
   filterTextFiles
-} from "./filters";
-import { closeExtensionOpenedFiles, closeExtensionPinnedFiles } from "./ui";
-import { verifyRepositoryState } from "./repoState";
-import { filterWorkspaceIgnoredFiles } from "./ignoredFiles";
+} from "../../git/filters";
+import { closeExtensionOpenedFiles, closeExtensionPinnedFiles } from "../../ui/ui";
+import { verifyRepositoryState } from "../../state/repoState";
+import { filterWorkspaceIgnoredFiles } from "../../state/ignoredFiles";
 
 /**
  * Opens changed files for a repository using current configuration.

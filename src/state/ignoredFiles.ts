@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { ChangedFile } from "./types";
+import { ChangedFile } from "../core/types";
 
 const WORKSPACE_IGNORED_FILES_KEY = "branchTabs.ignoredFilesByRepo";
 

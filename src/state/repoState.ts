@@ -1,4 +1,4 @@
-import { GitRepositoryState, Repository } from "./types";
+import { GitRepositoryState, Repository } from "../core/types";
 
 const repositoryStates = new Map<string, GitRepositoryState>();
 

@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { Repository, ChangedFile } from "./types";
-import { getExtensionSettings } from "./settings";
-import { resolveBaseRef, getChangedFiles } from "./gitDiff";
+import { Repository, ChangedFile } from "../../core/types";
+import { getExtensionSettings } from "../../core/settings";
+import { resolveBaseRef, getChangedFiles } from "../../git/gitDiff";
 import {
   filterByTypeOfChange,
   filterExcludedFiles,
   filterExcludedDirectories,
   filterGitIgnoredFilesDirectories
-} from "./filters";
+} from "../../git/filters";
 
 const REFRESH_DEBOUNCE_MS = 750;
 export const CHANGED_FILE_TREE_ITEM_CONTEXT = "branchTabs.changedFile";

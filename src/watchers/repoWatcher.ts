@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
-import { Repository } from "./types";
-import { output } from "./logger";
-import { getExtensionSettings } from "./settings";
-import { isRepositoryEnabledOnInitialCheckout } from "./repoEnablement";
-import { verifyRepositoryState } from "./repoState";
-import { openRepositoryChangedFiles } from "./openChangedFiles";
-import { closeExtensionOpenedFiles } from "./ui";
-import { getWorkspaceIgnoredFiles } from "./ignoredFiles";
+import { Repository } from "../core/types";
+import { output } from "../core/logger";
+import { getExtensionSettings } from "../core/settings";
+import { isRepositoryEnabledOnInitialCheckout } from "../state/repoEnablement";
+import { verifyRepositoryState } from "../state/repoState";
+import { openRepositoryChangedFiles } from "../features/changedFiles/openChangedFiles";
+import { closeExtensionOpenedFiles } from "../ui/ui";
+import { getWorkspaceIgnoredFiles } from "../state/ignoredFiles";
 
 const trackedRepositories = new Set<string>();
 

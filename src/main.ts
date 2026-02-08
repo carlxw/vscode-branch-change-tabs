@@ -2,20 +2,24 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { GitExtension } from "./types";
-import { output } from "./logger";
-import { initRepositoryTracking, clearAllExtensionTrackedRepositories } from "./repoEnablement";
-import { trackRepository } from "./repoWatcher";
-import { closeAllPinnedTabsInActiveGroup, closeTabsForFile, getEditorActiveRepository } from "./ui";
-import { openRepositoryChangedFiles } from "./openChangedFiles";
-import { ChangedFilesView, ChangedFileItem, COMMAND_VIEW_OPEN_FILE } from "./changedFilesView";
-import { doesRefExist } from "./gitDiff";
+import { GitExtension } from "./core/types";
+import { output } from "./core/logger";
+import { initRepositoryTracking, clearAllExtensionTrackedRepositories } from "./state/repoEnablement";
+import { trackRepository } from "./watchers/repoWatcher";
+import { closeAllPinnedTabsInActiveGroup, closeTabsForFile, getEditorActiveRepository } from "./ui/ui";
+import { openRepositoryChangedFiles } from "./features/changedFiles/openChangedFiles";
+import {
+  ChangedFilesView,
+  ChangedFileItem,
+  COMMAND_VIEW_OPEN_FILE
+} from "./features/changedFiles/changedFilesView";
+import { doesRefExist } from "./git/gitDiff";
 import {
   addWorkspaceIgnoredFile,
   getWorkspaceIgnoredFiles,
   removeWorkspaceIgnoredFile
-} from "./ignoredFiles";
-import { getRepositoryState } from "./repoState";
+} from "./state/ignoredFiles";
+import { getRepositoryState } from "./state/repoState";
 
 const COMMAND_DEV_CLEAR = "branchTabs.dev.clearRepositoryDecisions";
 const COMMAND_OPEN_CHANGED_FILES = "branchTabs.openChangedFiles";

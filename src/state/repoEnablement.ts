@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { Repository, ExtensionSEttings } from "./types";
-import { output } from "./logger";
+import { Repository, ExtensionSEttings } from "../core/types";
+import { output } from "../core/logger";
 
 const repositoryEnabledCache = new Map<string, boolean>();
 let extensionContext: vscode.ExtensionContext | undefined;
