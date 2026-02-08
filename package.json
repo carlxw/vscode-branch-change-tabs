@@ -28,7 +28,8 @@
     "build": "tsc -p .",
     "watch": "tsc -watch -p .",
     "lint": "echo \"No lint configured\"",
-    "package": "npx @vscode/vsce package"
+    "package": "npx @vscode/vsce package",
+    "publish": "npm run build && npm run package && npx @vscode/vsce publish && npx ovsx publish"
   },
 
   "contributes": {
@@ -36,7 +37,8 @@
       "explorer": [
         {
           "id": "branchTabs.changedFiles",
-          "name": "Branch Modified/Tracked Files"
+          "name": "Branch Modified/Tracked Files",
+          "icon": "img/icon.png"
         }
       ]
     },
