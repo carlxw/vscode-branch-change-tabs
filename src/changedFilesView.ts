@@ -11,6 +11,8 @@ import {
 } from "./filters";
 
 const REFRESH_DEBOUNCE_MS = 750;
+export const CHANGED_FILE_TREE_ITEM_CONTEXT = "branchTabs.changedFile";
+export const COMMAND_VIEW_OPEN_FILE = "branchTabs.changedFiles.openFile";
 
 export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<void>();
@@ -174,19 +176,7 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
  * Builds a tree item that opens a changed file.
  */
 function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.TreeItem {
-  const fileUri = vscode.Uri.file(path.join(repoRoot, file.path));
-  const item = new vscode.TreeItem(file.path, vscode.TreeItemCollapsibleState.None);
-
-  item.resourceUri = fileUri;
-  item.description = file.kind;
-  item.iconPath = new vscode.ThemeIcon(file.kind === "added" ? "diff-added" : "diff-modified");
-  item.command = {
-    command: "vscode.open",
-    title: "Open File",
-    arguments: [fileUri]
-  };
-
-  return item;
+  return new ChangedFileItem(file, repoRoot);
 }
 
 /**
@@ -197,4 +187,25 @@ function createPlaceholderItem(label: string): vscode.TreeItem {
   item.iconPath = new vscode.ThemeIcon("info");
 
   return item;
+}
+
+export class ChangedFileItem extends vscode.TreeItem {
+  readonly fileUri: vscode.Uri;
+
+  constructor(
+    readonly changedFile: ChangedFile,
+    readonly repoRoot: string
+  ) {
+    super(changedFile.path, vscode.TreeItemCollapsibleState.None);
+    this.fileUri = vscode.Uri.file(path.join(repoRoot, changedFile.path));
+    this.contextValue = CHANGED_FILE_TREE_ITEM_CONTEXT;
+    this.resourceUri = this.fileUri;
+    this.description = changedFile.kind;
+    this.iconPath = new vscode.ThemeIcon(changedFile.kind === "added" ? "diff-added" : "diff-modified");
+    this.command = {
+      command: COMMAND_VIEW_OPEN_FILE,
+      title: "Open File",
+      arguments: [this]
+    };
+  }
 }

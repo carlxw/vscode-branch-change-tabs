@@ -48,8 +48,53 @@
       {
         "command": "branchTabs.closePinnedTabsInGroup",
         "title": "Branch Change Tabs: Close Pinned Tabs in Currently Active Group"
+      },
+      {
+        "command": "branchTabs.changedFiles.openFile",
+        "title": "Open file"
+      },
+      {
+        "command": "branchTabs.changedFiles.ignoreFile",
+        "title": "Ignore file for this extension"
+      },
+      {
+        "command": "branchTabs.changedFiles.showDiffMain",
+        "title": "See diff (relative to the main branch)"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "branchTabs.changedFiles.openFile",
+          "when": "false"
+        },
+        {
+          "command": "branchTabs.changedFiles.ignoreFile",
+          "when": "false"
+        },
+        {
+          "command": "branchTabs.changedFiles.showDiffMain",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "branchTabs.changedFiles.openFile",
+          "when": "view == branchTabs.changedFiles && viewItem == branchTabs.changedFile",
+          "group": "inline@1"
+        },
+        {
+          "command": "branchTabs.changedFiles.ignoreFile",
+          "when": "view == branchTabs.changedFiles && viewItem == branchTabs.changedFile",
+          "group": "navigation@2"
+        },
+        {
+          "command": "branchTabs.changedFiles.showDiffMain",
+          "when": "view == branchTabs.changedFiles && viewItem == branchTabs.changedFile",
+          "group": "navigation@3"
+        }
+      ]
+    },
     "configuration": {
       "title": "Branch Change Tabs",
       "properties": {
