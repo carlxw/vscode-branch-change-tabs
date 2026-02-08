@@ -19,6 +19,7 @@ import { getRepositoryState } from "./repoState";
 
 const COMMAND_DEV_CLEAR = "branchTabs.dev.clearRepositoryDecisions";
 const COMMAND_OPEN_CHANGED_FILES = "branchTabs.openChangedFiles";
+const COMMAND_TOGGLE_IGNORE_ACTIVE_FILE = "branchTabs.toggleIgnoreActiveFile";
 const COMMAND_CLOSE_PINNED_GROUP_TABS = "branchTabs.closePinnedTabsInGroup";
 const COMMAND_VIEW_IGNORE_FILE = "branchTabs.changedFiles.ignoreFile";
 const COMMAND_VIEW_UNIGNORE_FILE = "branchTabs.changedFiles.unignoreFile";
@@ -108,6 +109,71 @@ export function activate(context: vscode.ExtensionContext) {
     changedFilesView.refresh();
   });
   context.subscriptions.push(openChangedCommand);
+
+  const toggleIgnoreActiveFileCommand = vscode.commands.registerCommand(
+    COMMAND_TOGGLE_IGNORE_ACTIVE_FILE,
+    async () => {
+      const activeUri = vscode.window.activeTextEditor?.document.uri;
+      if (!activeUri || activeUri.scheme !== "file") {
+        void vscode.window.showInformationMessage(
+          "Branch Change Tabs: open a file in the editor to toggle ignore."
+        );
+        return;
+      }
+
+      const repo = git.repositories.find((candidate) =>
+        isPathInRepo(activeUri.fsPath, candidate.rootUri.fsPath)
+      );
+      if (!repo) {
+        void vscode.window.showInformationMessage(
+          "Branch Change Tabs: active file is not inside an open git repository."
+        );
+        return;
+      }
+
+      const repoRelativePath = toRepoRelativePath(repo.rootUri.fsPath, activeUri.fsPath);
+      if (!repoRelativePath) {
+        void vscode.window.showInformationMessage(
+          "Branch Change Tabs: failed to resolve active file path relative to repository root."
+        );
+        return;
+      }
+
+      const ignored = getWorkspaceIgnoredFiles(context, repo.rootUri.fsPath).has(repoRelativePath);
+      if (ignored) {
+        const removed = await removeWorkspaceIgnoredFile(context, repo.rootUri.fsPath, repoRelativePath);
+        if (!removed) {
+          void vscode.window.showInformationMessage(
+            `Branch Change Tabs: "${repoRelativePath}" is not currently ignored.`
+          );
+          return;
+        }
+        await vscode.commands.executeCommand("workbench.action.pinEditor");
+        getRepositoryState(repo.rootUri.fsPath)?.openedFiles.add(activeUri.toString());
+        void vscode.window.showInformationMessage(
+          `Branch Change Tabs: "${repoRelativePath}" is no longer ignored and was pinned.`
+        );
+      } else {
+        const added = await addWorkspaceIgnoredFile(context, repo.rootUri.fsPath, repoRelativePath);
+        if (!added) {
+          void vscode.window.showInformationMessage(
+            `Branch Change Tabs: "${repoRelativePath}" is already ignored.`
+          );
+          return;
+        }
+        const closedTabsCount = await closeTabsForFile(activeUri);
+        getRepositoryState(repo.rootUri.fsPath)?.openedFiles.delete(activeUri.toString());
+        void vscode.window.showInformationMessage(
+          closedTabsCount > 0
+            ? `Branch Change Tabs: "${repoRelativePath}" is now ignored and was closed.`
+            : `Branch Change Tabs: "${repoRelativePath}" is now ignored for branch auto-open/pin.`
+        );
+      }
+
+      changedFilesView.refresh();
+    }
+  );
+  context.subscriptions.push(toggleIgnoreActiveFileCommand);
 
   const openChangedFileCommand = vscode.commands.registerCommand(
     COMMAND_VIEW_OPEN_FILE,
@@ -253,6 +319,28 @@ async function getFileContentsAtRef(
     }
     throw error;
   }
+}
+
+function isPathInRepo(filePath: string, repoRoot: string): boolean {
+  const normalizedFilePath = path.resolve(filePath);
+  const normalizedRepoRoot = path.resolve(repoRoot);
+  if (process.platform === "win32") {
+    const fileLower = normalizedFilePath.toLowerCase();
+    const repoLower = normalizedRepoRoot.toLowerCase();
+    return fileLower === repoLower || fileLower.startsWith(`${repoLower}${path.sep}`);
+  }
+  return (
+    normalizedFilePath === normalizedRepoRoot ||
+    normalizedFilePath.startsWith(`${normalizedRepoRoot}${path.sep}`)
+  );
+}
+
+function toRepoRelativePath(repoRoot: string, filePath: string): string | undefined {
+  const relative = path.relative(repoRoot, filePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    return undefined;
+  }
+  return relative.replace(/\\/g, "/");
 }
 
 

@@ -46,6 +46,10 @@
         "title": "Branch Change Tabs: Open Changed Files"
       },
       {
+        "command": "branchTabs.toggleIgnoreActiveFile",
+        "title": "Branch Change Tabs: Toggle Ignore for Active File"
+      },
+      {
         "command": "branchTabs.closePinnedTabsInGroup",
         "title": "Branch Change Tabs: Close Pinned Tabs in Currently Active Group"
       },
