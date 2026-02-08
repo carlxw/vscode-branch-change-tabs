@@ -6,15 +6,22 @@ import { GitExtension } from "./types";
 import { output } from "./logger";
 import { initRepositoryTracking, clearAllExtensionTrackedRepositories } from "./repoEnablement";
 import { trackRepository } from "./repoWatcher";
-import { closeAllPinnedTabsInActiveGroup, getEditorActiveRepository } from "./ui";
+import { closeAllPinnedTabsInActiveGroup, closeTabsForFile, getEditorActiveRepository } from "./ui";
 import { openRepositoryChangedFiles } from "./openChangedFiles";
 import { ChangedFilesView, ChangedFileItem, COMMAND_VIEW_OPEN_FILE } from "./changedFilesView";
 import { doesRefExist } from "./gitDiff";
+import {
+  addWorkspaceIgnoredFile,
+  getWorkspaceIgnoredFiles,
+  removeWorkspaceIgnoredFile
+} from "./ignoredFiles";
+import { getRepositoryState } from "./repoState";
 
 const COMMAND_DEV_CLEAR = "branchTabs.dev.clearRepositoryDecisions";
 const COMMAND_OPEN_CHANGED_FILES = "branchTabs.openChangedFiles";
 const COMMAND_CLOSE_PINNED_GROUP_TABS = "branchTabs.closePinnedTabsInGroup";
 const COMMAND_VIEW_IGNORE_FILE = "branchTabs.changedFiles.ignoreFile";
+const COMMAND_VIEW_UNIGNORE_FILE = "branchTabs.changedFiles.unignoreFile";
 const COMMAND_VIEW_SHOW_DIFF_MAIN = "branchTabs.changedFiles.showDiffMain";
 const MAIN_BRANCH_NAME = "main";
 const execFileAsync = promisify(execFile);
@@ -31,7 +38,9 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const git = gitExtension.getAPI(1);
-  const changedFilesView = new ChangedFilesView(getEditorActiveRepository);
+  const changedFilesView = new ChangedFilesView(getEditorActiveRepository, (repoRoot) =>
+    getWorkspaceIgnoredFiles(context, repoRoot)
+  );
   const changedFilesTree = vscode.window.createTreeView("branchTabs.changedFiles", {
     treeDataProvider: changedFilesView
   });
@@ -92,7 +101,10 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    await openRepositoryChangedFiles(repo, { ignoreEnablement: true });
+    await openRepositoryChangedFiles(repo, {
+      ignoreEnablement: true,
+      workspaceIgnoredFiles: getWorkspaceIgnoredFiles(context, repo.rootUri.fsPath)
+    });
     changedFilesView.refresh();
   });
   context.subscriptions.push(openChangedCommand);
@@ -114,32 +126,58 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item) {
         return;
       }
-
-      const config = vscode.workspace.getConfiguration("branchTabs", item.fileUri);
-      const currentExcluded = config.get<string[]>("excludedFiles", []);
-      const escapedPathRegex = `^${escapeRegex(item.changedFile.path)}$`;
-      if (currentExcluded.includes(escapedPathRegex)) {
+      const added = await addWorkspaceIgnoredFile(context, item.repoRoot, item.changedFile.path);
+      if (!added) {
         void vscode.window.showInformationMessage(
-          `Branch Change Tabs: "${item.changedFile.path}" is already excluded.`
+          `Branch Change Tabs: "${item.changedFile.path}" is already ignored.`
         );
         return;
       }
-      const configTarget = vscode.workspace.getWorkspaceFolder(item.fileUri)
-        ? vscode.ConfigurationTarget.WorkspaceFolder
-        : vscode.ConfigurationTarget.Workspace;
-
-      await config.update(
-        "excludedFiles",
-        [...currentExcluded, escapedPathRegex],
-        configTarget
-      );
+      const closedTabsCount = await closeTabsForFile(item.fileUri);
+      getRepositoryState(item.repoRoot)?.openedFiles.delete(item.fileUri.toString());
       void vscode.window.showInformationMessage(
-        `Branch Change Tabs: "${item.changedFile.path}" has been excluded.`
+        closedTabsCount > 0
+          ? `Branch Change Tabs: "${item.changedFile.path}" is now ignored and was closed.`
+          : `Branch Change Tabs: "${item.changedFile.path}" is now ignored for branch auto-open/pin.`
       );
       changedFilesView.refresh();
     }
   );
   context.subscriptions.push(ignoreChangedFileCommand);
+
+  const unignoreChangedFileCommand = vscode.commands.registerCommand(
+    COMMAND_VIEW_UNIGNORE_FILE,
+    async (item?: ChangedFileItem) => {
+      if (!item) {
+        return;
+      }
+      const removed = await removeWorkspaceIgnoredFile(context, item.repoRoot, item.changedFile.path);
+      if (!removed) {
+        void vscode.window.showInformationMessage(
+          `Branch Change Tabs: "${item.changedFile.path}" is not currently ignored.`
+        );
+        return;
+      }
+      try {
+        await vscode.commands.executeCommand("vscode.open", item.fileUri, {
+          preview: false,
+          preserveFocus: false
+        });
+        await vscode.commands.executeCommand("workbench.action.pinEditor");
+        getRepositoryState(item.repoRoot)?.openedFiles.add(item.fileUri.toString());
+      } catch (error) {
+        output.appendLine(`Failed to open unignored file "${item.changedFile.path}": ${String(error)}`);
+        void vscode.window.showErrorMessage(
+          `Branch Change Tabs: "${item.changedFile.path}" was un-ignored, but could not be opened.`
+        );
+      }
+      void vscode.window.showInformationMessage(
+        `Branch Change Tabs: "${item.changedFile.path}" is no longer ignored and was opened/pinned.`
+      );
+      changedFilesView.refresh();
+    }
+  );
+  context.subscriptions.push(unignoreChangedFileCommand);
 
   const showDiffAgainstMainCommand = vscode.commands.registerCommand(
     COMMAND_VIEW_SHOW_DIFF_MAIN,
@@ -194,15 +232,6 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(closePinnedGroupCommand);
 }
 
-/**
- * Extension deactivation hook (no-op).
- */
-export function deactivate() {}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 async function getFileContentsAtRef(
   repoRoot: string,
   ref: string,
@@ -225,3 +254,9 @@ async function getFileContentsAtRef(
     throw error;
   }
 }
+
+
+/**
+ * Extension deactivation hook (no-op).
+ */
+export function deactivate() {}

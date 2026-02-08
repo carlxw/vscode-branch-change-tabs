@@ -6,6 +6,7 @@ import { isRepositoryEnabledOnInitialCheckout } from "./repoEnablement";
 import { verifyRepositoryState } from "./repoState";
 import { openRepositoryChangedFiles } from "./openChangedFiles";
 import { closeExtensionOpenedFiles } from "./ui";
+import { getWorkspaceIgnoredFiles } from "./ignoredFiles";
 
 const trackedRepositories = new Set<string>();
 
@@ -29,7 +30,7 @@ export async function trackRepository(
     }
     state.pendingTimer = setTimeout(() => {
       state.pendingTimer = undefined;
-      void handleRepositoryChange(repo);
+      void handleRepositoryChange(repo, context);
     }, 200);
   });
 
@@ -39,7 +40,10 @@ export async function trackRepository(
 /**
  * Handles a repository state change by opening the branch's changed files.
  */
-async function handleRepositoryChange(repo: Repository): Promise<void> {
+async function handleRepositoryChange(
+  repo: Repository,
+  context: vscode.ExtensionContext
+): Promise<void> {
   const key = repo.rootUri.fsPath;
   const state = verifyRepositoryState(repo);
 
@@ -66,5 +70,8 @@ async function handleRepositoryChange(repo: Repository): Promise<void> {
   }
 
   output.appendLine(`Branch changed: ${previousBranch ?? "(unknown)"} -> ${currentBranch}`);
-  await openRepositoryChangedFiles(repo, { ignoreEnablement: false });
+  await openRepositoryChangedFiles(repo, {
+    ignoreEnablement: false,
+    workspaceIgnoredFiles: getWorkspaceIgnoredFiles(context, repo.rootUri.fsPath)
+  });
 }

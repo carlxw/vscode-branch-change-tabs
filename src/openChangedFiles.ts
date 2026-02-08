@@ -14,13 +14,14 @@ import {
 } from "./filters";
 import { closeExtensionOpenedFiles, closeExtensionPinnedFiles } from "./ui";
 import { verifyRepositoryState } from "./repoState";
+import { filterWorkspaceIgnoredFiles } from "./ignoredFiles";
 
 /**
  * Opens changed files for a repository using current configuration.
  */
 export async function openRepositoryChangedFiles(
   repo: Repository,
-  options: { ignoreEnablement: boolean }
+  options: { ignoreEnablement: boolean; workspaceIgnoredFiles?: Set<string> }
 ): Promise<void> {
   const settings = getExtensionSettings();
   if (settings.excludedBranches.includes(repo.state.HEAD?.name ?? "")) {
@@ -81,13 +82,22 @@ export async function openRepositoryChangedFiles(
     output.appendLine("All changed files were excluded by .gitignore.");
     return;
   }
+  const workspaceIgnoredFiltered = filterWorkspaceIgnoredFiles(
+    gitIgnoredFiltered,
+    options.workspaceIgnoredFiles ?? new Set<string>()
+  );
+  if (!workspaceIgnoredFiltered.length) {
+    output.appendLine("All changed files were excluded by workspace ignore list.");
+    return;
+  }
 
   output.appendLine(`Files after regex filter: ${filteredFiles.length}`);
   output.appendLine(`Files after .gitignore filter: ${gitIgnoredFiltered.length}`);
+  output.appendLine(`Files after workspace ignore filter: ${workspaceIgnoredFiltered.length}`);
 
-  let filesToConsider = gitIgnoredFiltered;
+  let filesToConsider = workspaceIgnoredFiltered;
   if (settings.textFilesOnly) {
-    filesToConsider = await filterTextFiles(repoRoot, filteredFiles);
+    filesToConsider = await filterTextFiles(repoRoot, workspaceIgnoredFiltered);
     output.appendLine(`Text files after filter: ${filesToConsider.length}`);
 
     if (filesToConsider.length === 0) {

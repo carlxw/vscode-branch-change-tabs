@@ -103,3 +103,26 @@ export async function closeAllPinnedTabsInActiveGroup(): Promise<void> {
 
   await vscode.window.tabGroups.close(toClose, true);
 }
+
+/**
+ * Closes all open tabs for a specific file URI across all groups.
+ */
+export async function closeTabsForFile(fileUri: vscode.Uri): Promise<number> {
+  const toClose: vscode.Tab[] = [];
+  const target = fileUri.toString();
+
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input;
+      if (input instanceof vscode.TabInputText && input.uri.toString() === target) {
+        toClose.push(tab);
+      }
+    }
+  }
+
+  if (toClose.length > 0) {
+    await vscode.window.tabGroups.close(toClose, true);
+  }
+
+  return toClose.length;
+}

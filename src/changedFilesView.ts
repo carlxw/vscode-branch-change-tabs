@@ -12,6 +12,7 @@ import {
 
 const REFRESH_DEBOUNCE_MS = 750;
 export const CHANGED_FILE_TREE_ITEM_CONTEXT = "branchTabs.changedFile";
+export const CHANGED_FILE_IGNORED_TREE_ITEM_CONTEXT = "branchTabs.changedFileIgnored";
 export const COMMAND_VIEW_OPEN_FILE = "branchTabs.changedFiles.openFile";
 
 export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -24,7 +25,10 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
   private viewVisible = true;
   private pendingRefresh = false;
 
-  constructor(private readonly getRepository: () => Repository | undefined) {}
+  constructor(
+    private readonly getRepository: () => Repository | undefined,
+    private readonly getWorkspaceIgnoredFilesForRepo: (repoRoot: string) => Set<string>
+  ) {}
 
   /**
    * Signals the view to refresh, debounced to avoid rapid git calls.
@@ -168,15 +172,18 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return;
     }
 
-    this.cachedItems = gitIgnoredFiltered.map((file) => createChangedFileItem(file, repoRoot));
+    const workspaceIgnored = this.getWorkspaceIgnoredFilesForRepo(repoRoot);
+    this.cachedItems = gitIgnoredFiltered.map((file) =>
+      createChangedFileItem(file, repoRoot, workspaceIgnored.has(file.path))
+    );
   }
 }
 
 /**
  * Builds a tree item that opens a changed file.
  */
-function createChangedFileItem(file: ChangedFile, repoRoot: string): vscode.TreeItem {
-  return new ChangedFileItem(file, repoRoot);
+function createChangedFileItem(file: ChangedFile, repoRoot: string, ignored: boolean): vscode.TreeItem {
+  return new ChangedFileItem(file, repoRoot, ignored);
 }
 
 /**
@@ -194,14 +201,22 @@ export class ChangedFileItem extends vscode.TreeItem {
 
   constructor(
     readonly changedFile: ChangedFile,
-    readonly repoRoot: string
+    readonly repoRoot: string,
+    readonly ignored: boolean
   ) {
     super(changedFile.path, vscode.TreeItemCollapsibleState.None);
     this.fileUri = vscode.Uri.file(path.join(repoRoot, changedFile.path));
-    this.contextValue = CHANGED_FILE_TREE_ITEM_CONTEXT;
+    this.contextValue = ignored
+      ? CHANGED_FILE_IGNORED_TREE_ITEM_CONTEXT
+      : CHANGED_FILE_TREE_ITEM_CONTEXT;
     this.resourceUri = this.fileUri;
-    this.description = changedFile.kind;
-    this.iconPath = new vscode.ThemeIcon(changedFile.kind === "added" ? "diff-added" : "diff-modified");
+    this.description = ignored ? `${changedFile.kind} (ignored)` : changedFile.kind;
+    this.iconPath = ignored
+      ? new vscode.ThemeIcon("eye-closed")
+      : new vscode.ThemeIcon(changedFile.kind === "added" ? "diff-added" : "diff-modified");
+    if (ignored) {
+      this.tooltip = `${changedFile.path}\nIgnored for branch auto-open/pin.`;
+    }
     this.command = {
       command: COMMAND_VIEW_OPEN_FILE,
       title: "Open File",
