@@ -13,7 +13,8 @@ import {
   ChangedFileItem,
   COMMAND_VIEW_OPEN_FILE
 } from "./features/changedFiles/changedFilesView";
-import { doesRefExist } from "./git/gitDiff";
+import { doesRefExist, resolveBaseRef } from "./git/gitDiff";
+import { getExtensionSettings } from "./core/settings";
 import {
   addWorkspaceIgnoredFile,
   getWorkspaceIgnoredFiles,
@@ -28,7 +29,6 @@ const COMMAND_CLOSE_PINNED_GROUP_TABS = "branchTabs.closePinnedTabsInGroup";
 const COMMAND_VIEW_IGNORE_FILE = "branchTabs.changedFiles.ignoreFile";
 const COMMAND_VIEW_UNIGNORE_FILE = "branchTabs.changedFiles.unignoreFile";
 const COMMAND_VIEW_SHOW_DIFF_MAIN = "branchTabs.changedFiles.showDiffMain";
-const MAIN_BRANCH_NAME = "main";
 const execFileAsync = promisify(execFile);
 
 /**
@@ -249,17 +249,34 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(unignoreChangedFileCommand);
 
-  const showDiffAgainstMainCommand = vscode.commands.registerCommand(
+  const showDiffAgainstBaseCommand = vscode.commands.registerCommand(
     COMMAND_VIEW_SHOW_DIFF_MAIN,
     async (item?: ChangedFileItem) => {
       if (!item) {
         return;
       }
 
-      const mainExists = await doesRefExist(item.repoRoot, MAIN_BRANCH_NAME);
-      if (!mainExists) {
+      const repo = git.repositories.find((candidate) =>
+        isPathInRepo(item.fileUri.fsPath, candidate.rootUri.fsPath)
+      );
+      const branchName = repo?.state.HEAD?.name;
+      if (!repo || !branchName) {
         void vscode.window.showWarningMessage(
-          `Branch Change Tabs: branch "${MAIN_BRANCH_NAME}" was not found in this repository.`
+          "Branch Change Tabs: active repository or branch could not be determined."
+        );
+        return;
+      }
+
+      const settings = getExtensionSettings();
+      const baseRef = await resolveBaseRef(
+        repo.rootUri.fsPath,
+        settings.baseBranch,
+        branchName,
+        repo.state.HEAD?.upstream?.name
+      );
+      if (!baseRef || !(await doesRefExist(repo.rootUri.fsPath, baseRef))) {
+        void vscode.window.showWarningMessage(
+          "Branch Change Tabs: a valid base branch/ref could not be resolved in this repository."
         );
         return;
       }
@@ -269,7 +286,7 @@ export function activate(context: vscode.ExtensionContext) {
         const rightDoc = await vscode.workspace.openTextDocument(rightUri);
         const leftContent = await getFileContentsAtRef(
           item.repoRoot,
-          MAIN_BRANCH_NAME,
+          baseRef,
           item.changedFile.path
         );
         const leftDoc = await vscode.workspace.openTextDocument({
@@ -281,7 +298,7 @@ export function activate(context: vscode.ExtensionContext) {
           "vscode.diff",
           leftDoc.uri,
           rightUri,
-          `${path.basename(item.changedFile.path)} (${MAIN_BRANCH_NAME} vs Working Tree)`
+          `${path.basename(item.changedFile.path)} (${baseRef} vs Working Tree)`
         );
       } catch (error) {
         output.appendLine(`Failed to open diff for "${item.changedFile.path}": ${String(error)}`);
@@ -291,7 +308,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }
   );
-  context.subscriptions.push(showDiffAgainstMainCommand);
+  context.subscriptions.push(showDiffAgainstBaseCommand);
 
   const closePinnedGroupCommand = vscode.commands.registerCommand(
     COMMAND_CLOSE_PINNED_GROUP_TABS,

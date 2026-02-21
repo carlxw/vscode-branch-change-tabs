@@ -69,7 +69,7 @@
       },
       {
         "command": "branchTabs.changedFiles.showDiffMain",
-        "title": "See diff (relative to the main branch)"
+        "title": "See diff (relative to the base branch)"
       }
     ],
     "menus": {
@@ -133,12 +133,12 @@
         "branchTabs.includeModifiedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Open files that are modified relative to the main branch."
+          "description": "Open files that are modified relative to the base branch."
         },
         "branchTabs.includeNewlyTrackedFiles": {
           "type": "boolean",
           "default": true,
-          "description": "Open files that are newly tracked relative to the main branch."
+          "description": "Open files that are newly tracked relative to the base branch."
         },
         "branchTabs.pinModifiedFiles": {
           "type": "boolean",
@@ -225,8 +225,8 @@
         },
         "branchTabs.baseBranch": {
           "type": "string",
-          "default": "main",
-          "description": "Optional base branch/ref to diff against."
+          "default": "",
+          "description": "Optional base branch/ref to diff against. If empty, uses upstream when available, otherwise main/master."
         }
       }
     }

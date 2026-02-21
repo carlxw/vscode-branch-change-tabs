@@ -2,7 +2,11 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { Repository, ChangedFile } from "../../core/types";
 import { getExtensionSettings } from "../../core/settings";
-import { resolveBaseRef, getChangedFiles } from "../../git/gitDiff";
+import {
+  resolveBaseRef,
+  getChangedFiles,
+  filterChangedFilesByCurrentAuthor
+} from "../../git/gitDiff";
 import {
   filterByTypeOfChange,
   filterExcludedFiles,
@@ -152,8 +156,14 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return;
     }
 
+    const ownedFiles = await filterChangedFilesByCurrentAuthor(repoRoot, branchName, changedFiles);
+    if (!ownedFiles.length) {
+      this.cachedItems = [createPlaceholderItem("No changes owned by the current git author.")];
+      return;
+    }
+
     const selectableFiles = filterByTypeOfChange(
-      changedFiles,
+      ownedFiles,
       settings.includeModifiedFiles,
       settings.includeNewlyTrackedFiles
     );

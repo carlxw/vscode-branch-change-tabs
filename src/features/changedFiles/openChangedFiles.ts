@@ -4,7 +4,7 @@ import { Repository } from "../../core/types";
 import { output } from "../../core/logger";
 import { getExtensionSettings } from "../../core/settings";
 import { isRepositoryEnabledOnInitialCheckout } from "../../state/repoEnablement";
-import { resolveBaseRef, getChangedFiles } from "../../git/gitDiff";
+import { resolveBaseRef, getChangedFiles, filterChangedFilesByCurrentAuthor } from "../../git/gitDiff";
 import {
   filterByTypeOfChange,
   filterExcludedFiles,
@@ -56,8 +56,14 @@ export async function openRepositoryChangedFiles(
     return;
   }
 
+  const ownedFiles = await filterChangedFilesByCurrentAuthor(repoRoot, headName, changedFiles);
+  if (!ownedFiles.length) {
+    output.appendLine("No changed files owned by the current git author.");
+    return;
+  }
+
   const selectableFiles = filterByTypeOfChange(
-    changedFiles,
+    ownedFiles,
     settings.includeModifiedFiles,
     settings.includeNewlyTrackedFiles
   );
