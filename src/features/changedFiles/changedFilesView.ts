@@ -18,6 +18,7 @@ const REFRESH_DEBOUNCE_MS = 750;
 export const CHANGED_FILE_TREE_ITEM_CONTEXT = "branchTabs.changedFile";
 export const CHANGED_FILE_IGNORED_TREE_ITEM_CONTEXT = "branchTabs.changedFileIgnored";
 export const COMMAND_VIEW_OPEN_FILE = "branchTabs.changedFiles.openFile";
+export const COMMAND_VIEW_SEARCH_FILES = "branchTabs.changedFiles.search";
 
 export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<void>();
@@ -28,6 +29,7 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
   private cachedItems: vscode.TreeItem[] | null = null;
   private viewVisible = true;
   private pendingRefresh = false;
+  private searchQuery = "";
 
   constructor(
     private readonly getRepository: () => Repository | undefined,
@@ -66,6 +68,30 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       this.pendingRefresh = false;
       this.refresh();
     }
+  }
+
+  /**
+   * Returns the active search query for this view.
+   */
+  getSearchQuery(): string {
+    return this.searchQuery;
+  }
+
+  /**
+   * Updates the search query and refreshes the view.
+   */
+  setSearchQuery(query: string): void {
+    const normalized = query.trim().toLowerCase();
+    if (normalized === this.searchQuery) {
+      return;
+    }
+    this.searchQuery = normalized;
+    this.cachedItems = null;
+    if (this.viewVisible) {
+      void this.loadData();
+      return;
+    }
+    this.pendingRefresh = true;
   }
 
   /**
@@ -182,8 +208,14 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
       return;
     }
 
+    const searchFiltered = filterFilesBySearch(gitIgnoredFiltered, this.searchQuery);
+    if (!searchFiltered.length) {
+      this.cachedItems = [createPlaceholderItem(`No changed files match search "${this.searchQuery}".`)];
+      return;
+    }
+
     const workspaceIgnored = this.getWorkspaceIgnoredFilesForRepo(repoRoot);
-    this.cachedItems = gitIgnoredFiltered.map((file) =>
+    this.cachedItems = searchFiltered.map((file) =>
       createChangedFileItem(file, repoRoot, workspaceIgnored.has(file.path))
     );
   }
@@ -194,6 +226,17 @@ export class ChangedFilesView implements vscode.TreeDataProvider<vscode.TreeItem
  */
 function createChangedFileItem(file: ChangedFile, repoRoot: string, ignored: boolean): vscode.TreeItem {
   return new ChangedFileItem(file, repoRoot, ignored);
+}
+
+/**
+ * Applies a case-insensitive path filter for view search.
+ */
+function filterFilesBySearch(files: ChangedFile[], query: string): ChangedFile[] {
+  if (!query) {
+    return files;
+  }
+
+  return files.filter((file) => file.path.toLowerCase().includes(query));
 }
 
 /**

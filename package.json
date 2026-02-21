@@ -60,6 +60,12 @@
         "title": "Open file"
       },
       {
+        "command": "branchTabs.changedFiles.search",
+        "title": "Search Changed Files",
+        "shortTitle": "Search",
+        "icon": "$(search)"
+      },
+      {
         "command": "branchTabs.changedFiles.ignoreFile",
         "title": "Ignore file for this extension"
       },
@@ -112,8 +118,28 @@
           "when": "view == branchTabs.changedFiles && (viewItem == branchTabs.changedFile || viewItem == branchTabs.changedFileIgnored)",
           "group": "navigation@3"
         }
+      ],
+      "view/title": [
+        {
+          "command": "branchTabs.changedFiles.search",
+          "when": "view == branchTabs.changedFiles",
+          "group": "navigation@1"
+        }
       ]
     },
+    "keybindings": [
+      {
+        "command": "branchTabs.changedFiles.search",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "view == branchTabs.changedFiles && listFocus"
+      },
+      {
+        "command": "branchTabs.changedFiles.search",
+        "key": "meta+f",
+        "when": "view == branchTabs.changedFiles && listFocus && isLinux"
+      }
+    ],
     "configuration": {
       "title": "Branch Change Tabs",
       "properties": {

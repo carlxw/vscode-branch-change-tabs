@@ -11,7 +11,8 @@ import { openRepositoryChangedFiles } from "./features/changedFiles/openChangedF
 import {
   ChangedFilesView,
   ChangedFileItem,
-  COMMAND_VIEW_OPEN_FILE
+  COMMAND_VIEW_OPEN_FILE,
+  COMMAND_VIEW_SEARCH_FILES
 } from "./features/changedFiles/changedFilesView";
 import { doesRefExist, resolveBaseRef } from "./git/gitDiff";
 import { getExtensionSettings } from "./core/settings";
@@ -189,6 +190,24 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
   context.subscriptions.push(openChangedFileCommand);
+
+  const searchChangedFilesCommand = vscode.commands.registerCommand(
+    COMMAND_VIEW_SEARCH_FILES,
+    async () => {
+      const value = await vscode.window.showInputBox({
+        prompt:
+          "Search changed files by path.",
+        placeHolder: "Example: src/main",
+        value: changedFilesView.getSearchQuery()
+      });
+      if (value === undefined) {
+        return;
+      }
+
+      changedFilesView.setSearchQuery(value);
+    }
+  );
+  context.subscriptions.push(searchChangedFilesCommand);
 
   const ignoreChangedFileCommand = vscode.commands.registerCommand(
     COMMAND_VIEW_IGNORE_FILE,

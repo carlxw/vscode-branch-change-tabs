@@ -54,6 +54,9 @@ These settings live under `branchTabs.*`:
   - Opens the current branch's changed files for the active repository using your configured settings.
 - `Branch Change Tabs: Close Pinned Tabs in Active Group`
   - Closes pinned tabs in the currently active editor group.
+- `Search Changed Files`
+  - Filters the explorer view list of changed files by path.
+  - Shortcut in the changed-files explorer view: `Ctrl+F` / `Cmd+F` (also `Super/Meta+F` on Linux).
 - `branchTabs.baseBranch` (string, default: `""`)
   - Optional base branch/ref to diff against. If empty, uses upstream if set; otherwise
   `main`/`master` when available.
